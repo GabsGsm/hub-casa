@@ -14,7 +14,7 @@ class FinancialTransactionRepository
     public function getByHouse(int $houseId): Collection
     {
         return FinancialTransaction::query()
-            ->with('category:id,name,color', 'cycle:id,name,day_of_month')
+            ->with('category:id,name,color', 'cycle:id,name,day_of_month', 'assignees:id,name')
             ->where('house_id', $houseId)
             ->orderByDesc('due_date')
             ->orderByDesc('created_at')

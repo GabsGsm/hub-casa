@@ -83,6 +83,21 @@ class User extends Authenticatable
         return $this->belongsToMany(Task::class, 'task_user');
     }
 
+    public function agendaEvents()
+    {
+        return $this->hasMany(AgendaEvent::class, 'created_by');
+    }
+
+    public function shoppingLists()
+    {
+        return $this->hasMany(ShoppingList::class, 'created_by');
+    }
+
+    public function pantryItems()
+    {
+        return $this->hasMany(PantryItem::class, 'created_by');
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';

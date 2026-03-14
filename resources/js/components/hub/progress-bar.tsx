@@ -5,7 +5,7 @@ type ProgressBarProps = {
     max: number;
     height?: number;
     color?: string;
-    overColor?: string;
+    animate?: boolean;
     className?: string;
 };
 
@@ -14,7 +14,7 @@ export function ProgressBar({
     max,
     height = 6,
     color = '#2563EB',
-    overColor = '#DC2626',
+    animate = true,
     className,
 }: ProgressBarProps) {
     const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
@@ -22,17 +22,16 @@ export function ProgressBar({
 
     return (
         <div
-            className={cn(
-                'w-full overflow-hidden rounded-full bg-[var(--hc-gray-100)]',
-                className,
-            )}
+            className={cn('w-full overflow-hidden rounded-full bg-[#F0EFED]', className)}
             style={{ height }}
         >
             <div
-                className="h-full transition-[width] duration-300 ease-out"
                 style={{
                     width: `${pct}%`,
-                    background: over ? overColor : color,
+                    height: '100%',
+                    background: over ? '#DC2626' : color,
+                    transition: animate ? 'width 400ms ease-out' : undefined,
+                    borderRadius: height,
                 }}
             />
         </div>

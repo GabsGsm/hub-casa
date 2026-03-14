@@ -12,98 +12,45 @@ import { store } from '@/routes/register';
 
 export default function Register() {
     return (
-        <AuthLayout
-            title="Create an account"
-            description="Enter your details below to create your account"
-        >
-            <Head title="Register" />
+        <AuthLayout title="Criar conta" description="Preencha os dados abaixo para começar">
+            <Head title="Criar conta" />
             <Form
                 {...store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
-                className="flex flex-col gap-6"
+                className="flex flex-col gap-5"
             >
                 {({ processing, errors }) => (
                     <>
-                        <div className="grid gap-6">
-                            <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
-                                <Input
-                                    id="name"
-                                    type="text"
-                                    required
-                                    autoFocus
-                                    tabIndex={1}
-                                    autoComplete="name"
-                                    name="name"
-                                    placeholder="Full name"
-                                />
-                                <InputError
-                                    message={errors.name}
-                                    className="mt-2"
-                                />
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-sm font-medium text-[#3D3C3A]">Nome completo</Label>
+                                <Input type="text" required autoFocus tabIndex={1} autoComplete="name" name="name" placeholder="Seu nome" />
+                                <InputError message={errors.name} />
                             </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    required
-                                    tabIndex={2}
-                                    autoComplete="email"
-                                    name="email"
-                                    placeholder="email@example.com"
-                                />
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-sm font-medium text-[#3D3C3A]">E-mail</Label>
+                                <Input type="email" required tabIndex={2} autoComplete="email" name="email" placeholder="seu@email.com" />
                                 <InputError message={errors.email} />
                             </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="password">Password</Label>
-                                <PasswordInput
-                                    id="password"
-                                    required
-                                    tabIndex={3}
-                                    autoComplete="new-password"
-                                    name="password"
-                                    placeholder="Password"
-                                />
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-sm font-medium text-[#3D3C3A]">Senha</Label>
+                                <PasswordInput required tabIndex={3} autoComplete="new-password" name="password" placeholder="Mínimo 8 caracteres" />
                                 <InputError message={errors.password} />
                             </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="password_confirmation">
-                                    Confirm password
-                                </Label>
-                                <PasswordInput
-                                    id="password_confirmation"
-                                    required
-                                    tabIndex={4}
-                                    autoComplete="new-password"
-                                    name="password_confirmation"
-                                    placeholder="Confirm password"
-                                />
-                                <InputError
-                                    message={errors.password_confirmation}
-                                />
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-sm font-medium text-[#3D3C3A]">Confirmar senha</Label>
+                                <PasswordInput required tabIndex={4} autoComplete="new-password" name="password_confirmation" placeholder="Repita a senha" />
+                                <InputError message={errors.password_confirmation} />
                             </div>
-
-                            <Button
-                                type="submit"
-                                className="mt-2 w-full"
-                                tabIndex={5}
-                                data-test="register-user-button"
-                            >
+                            <Button type="submit" className="mt-1 w-full" tabIndex={5}>
                                 {processing && <Spinner />}
-                                Create account
+                                Criar conta
                             </Button>
                         </div>
-
-                        <div className="text-center text-sm text-muted-foreground">
-                            Already have an account?{' '}
-                            <TextLink href={login()} tabIndex={6}>
-                                Log in
-                            </TextLink>
+                        <div className="text-center text-sm text-[#9B9A96]">
+                            Já tem uma conta?{' '}
+                            <TextLink href={login()} tabIndex={6}>Entrar</TextLink>
                         </div>
                     </>
                 )}

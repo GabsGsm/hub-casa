@@ -13,54 +13,50 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
 
     return (
         <SidebarGroup className="px-2 py-0">
-            <SidebarMenu>
+            <SidebarMenu className="gap-0.5">
                 {items.map((item) => {
                     const isActive = isCurrentUrl(item.href);
+                    const activeColor = item.color ?? '#1A1917';
                     return (
-                    <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton
-                            asChild
-                            isActive={isActive}
-                            tooltip={{ children: item.title }}
-                            className="h-9 rounded-[6px] px-3 transition-colors duration-150"
-                            style={
-                                isActive
-                                    ? {
-                                          borderLeftWidth: 2,
-                                          borderLeftColor:
-                                              item.color ?? '#1A1917',
-                                          backgroundColor:
-                                              'var(--hc-gray-100)',
-                                      }
-                                    : {
-                                          borderLeftWidth: 2,
-                                          borderLeftColor: 'transparent',
-                                      }
-                            }
-                        >
-                            <Link href={item.href} prefetch>
-                                {item.icon && (
-                                    <item.icon
-                                        className="size-4 shrink-0"
+                        <SidebarMenuItem key={item.title}>
+                            <SidebarMenuButton
+                                asChild
+                                isActive={isActive}
+                                tooltip={{ children: item.title }}
+                                className="h-9 cursor-pointer select-none rounded-[6px] transition-all duration-150"
+                                style={
+                                    isActive
+                                        ? {
+                                              borderLeft: `2px solid ${activeColor}`,
+                                              paddingLeft: 10,
+                                              backgroundColor: '#F0EFED',
+                                          }
+                                        : {
+                                              borderLeft: '2px solid transparent',
+                                          }
+                                }
+                            >
+                                <Link href={item.href} prefetch className="flex items-center gap-2 px-3 py-2">
+                                    {item.icon && (
+                                        <item.icon
+                                            size={16}
+                                            className="shrink-0"
+                                            style={{
+                                                color: isActive ? activeColor : '#9B9A96',
+                                            }}
+                                        />
+                                    )}
+                                    <span
+                                        className="text-sm"
                                         style={{
-                                            color: isActive
-                                                ? (item.color ?? '#1A1917')
-                                                : 'var(--hc-gray-400)',
+                                            color: isActive ? '#1A1917' : '#6B6A67',
                                         }}
-                                    />
-                                )}
-                                <span
-                                    style={{
-                                        color: isActive
-                                            ? 'var(--hc-gray-900)'
-                                            : 'var(--hc-gray-500)',
-                                    }}
-                                >
-                                    {item.title}
-                                </span>
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
+                                    >
+                                        {item.title}
+                                    </span>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
                     );
                 })}
             </SidebarMenu>

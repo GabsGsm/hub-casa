@@ -1,9 +1,10 @@
 import { cn } from '@/lib/utils';
 
-const statusStyles: Record<string, string> = {
-    pago: 'bg-[#ECFDF3] text-[#027A48]',
-    aberto: 'bg-[#FFFAEB] text-[#B54708]',
-    impossibilitado: 'bg-[#F2F4F7] text-[#667085]',
+/* Exact colors from Figma Financeiro.tsx statusConfig */
+const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
+    pago: { bg: '#F0FDF4', text: '#15803D', label: 'Pago' },
+    aberto: { bg: '#FFFBEB', text: '#B45309', label: 'Aberto' },
+    impossibilitado: { bg: '#F0EFED', text: '#6B6A67', label: 'Impossibilitado' },
 };
 
 export function StatusPill({
@@ -13,19 +14,16 @@ export function StatusPill({
     status: string;
     className?: string;
 }) {
+    const cfg = statusConfig[status.toLowerCase()] ?? statusConfig.aberto;
     return (
         <span
             className={cn(
                 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                statusStyles[status] ?? 'bg-[#F2F4F7] text-[#667085]',
                 className,
             )}
+            style={{ background: cfg.bg, color: cfg.text }}
         >
-            {status === 'pago'
-                ? 'Pago'
-                : status === 'impossibilitado'
-                  ? 'Impossibilitado'
-                  : 'Aberto'}
+            {cfg.label}
         </span>
     );
 }

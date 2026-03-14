@@ -167,22 +167,28 @@ class FinanceiroService
     private function buildTransactionsPayload(Collection $transactions): Collection
     {
         return $transactions->map(fn (FinancialTransaction $t) => [
-            'id'       => $t->id,
-            'title'    => $t->title,
-            'amount'   => (float) $t->amount,
-            'type'     => $t->type,
-            'status'   => $t->status,
-            'due_date' => optional($t->due_date)->format('Y-m-d'),
-            'cycle'    => $t->cycle ? [
+            'id'                 => $t->id,
+            'title'              => $t->title,
+            'amount'             => (float) $t->amount,
+            'type'               => $t->type,
+            'status'             => $t->status,
+            'due_date'           => optional($t->due_date)->format('Y-m-d'),
+            'recurrence'         => $t->recurrence,
+            'installments_count' => $t->installments_count,
+            'cycle'              => $t->cycle ? [
                 'id'           => $t->cycle->id,
                 'name'         => $t->cycle->name,
                 'day_of_month' => $t->cycle->day_of_month,
             ] : null,
-            'category' => $t->category ? [
+            'category'           => $t->category ? [
                 'id'    => $t->category->id,
                 'name'  => $t->category->name,
                 'color' => $t->category->color,
             ] : null,
+            'assignees'          => $t->assignees->map(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+            ]),
         ]);
     }
 

@@ -99,6 +99,7 @@ class TarefasController extends Controller
             'description' => ['nullable', 'string'],
             'color' => ['nullable', 'string', 'max:20'],
             'completed' => ['nullable', 'boolean'],
+            'day_of_week' => ['nullable', 'integer', 'min:0', 'max:6'],
             'assignee_ids' => ['nullable', 'array'],
             'assignee_ids.*' => ['integer', 'exists:users,id'],
         ]);

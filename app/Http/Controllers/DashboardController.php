@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\FinancialTransaction;
 use App\Models\PaymentCycle;
 use App\Models\Task;
+use App\Models\AgendaEvent;
+use App\Models\PantryItem;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -107,6 +109,27 @@ class DashboardController extends Controller
                 ];
             });
 
+        $dispensaAlerts = PantryItem::query()
+            ->where('house_id', $house->id)
+            ->whereColumn('quantity_current', '<=', 'quantity_min')
+            ->count();
+
+        $upcomingEvents = AgendaEvent::query()
+            ->where('house_id', $house->id)
+            ->whereDate('date', '>=', $today)
+            ->orderBy('date')
+            ->orderBy('time')
+            ->limit(4)
+            ->get()
+            ->map(function (AgendaEvent $event) {
+                return [
+                    'id' => $event->id,
+                    'title' => $event->title,
+                    'date' => $event->date->format('d/m'),
+                    'time' => substr((string) $event->time, 0, 5),
+                ];
+            });
+
         return Inertia::render('dashboard', [
             'house' => [
                 'id' => $house->id,
@@ -123,13 +146,14 @@ class DashboardController extends Controller
                     'total' => $tasksTotal,
                 ],
                 'dispensa' => [
-                    'alerts' => 0,
+                    'alerts' => $dispensaAlerts,
                 ],
             ],
             'cycles' => $cyclesPayload,
             'transactions' => $recentTransactions,
             'tasksToday' => $tasksToday,
             'todayLabel' => $today->locale('pt_BR')->translatedFormat('l, d'),
+            'upcomingEvents' => $upcomingEvents,
         ]);
     }
 

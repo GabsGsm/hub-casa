@@ -1,18 +1,15 @@
-@import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
+@import 'tailwindcss';
 @import 'tw-animate-css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
 @theme {
-    --font-sans:
-        'Geist', 'Inter', ui-sans-serif, system-ui, sans-serif,
-        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-        'Noto Color Emoji';
-    --font-mono:
-        'Geist Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo,
-        Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -20,38 +17,28 @@
 
     --color-background: var(--background);
     --color-foreground: var(--foreground);
-
     --color-card: var(--card);
     --color-card-foreground: var(--card-foreground);
-
     --color-popover: var(--popover);
     --color-popover-foreground: var(--popover-foreground);
-
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
-
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
-
     --color-muted: var(--muted);
     --color-muted-foreground: var(--muted-foreground);
-
     --color-accent: var(--accent);
     --color-accent-foreground: var(--accent-foreground);
-
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
-
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
-
     --color-chart-1: var(--chart-1);
     --color-chart-2: var(--chart-2);
     --color-chart-3: var(--chart-3);
     --color-chart-4: var(--chart-4);
     --color-chart-5: var(--chart-5);
-
     --color-sidebar: var(--sidebar);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar-primary: var(--sidebar-primary);
@@ -63,14 +50,16 @@
 }
 
 :root {
+    /* Figma exact tokens */
+    --font-size: 14px;
     --background: #F8F8F7;
     --foreground: #1A1917;
-    --card: #FFFFFF;
+    --card: #ffffff;
     --card-foreground: #1A1917;
-    --popover: #FFFFFF;
+    --popover: #ffffff;
     --popover-foreground: #1A1917;
     --primary: #1A1917;
-    --primary-foreground: #FFFFFF;
+    --primary-foreground: #ffffff;
     --secondary: #F0EFED;
     --secondary-foreground: #1A1917;
     --muted: #F0EFED;
@@ -78,9 +67,13 @@
     --accent: #F0EFED;
     --accent-foreground: #1A1917;
     --destructive: #DC2626;
-    --destructive-foreground: #FFFFFF;
+    --destructive-foreground: #ffffff;
     --border: #E4E3E0;
-    --input: #E4E3E0;
+    --input: transparent;
+    --input-background: #F0EFED;
+    --switch-background: #C8C7C3;
+    --font-weight-medium: 500;
+    --font-weight-normal: 400;
     --ring: #C8C7C3;
     --chart-1: #2563EB;
     --chart-2: #7C3AED;
@@ -88,10 +81,12 @@
     --chart-4: #D97706;
     --chart-5: #DC2626;
     --radius: 0.75rem;
-    --sidebar: #FFFFFF;
+
+    /* Sidebar */
+    --sidebar: #ffffff;
     --sidebar-foreground: #1A1917;
     --sidebar-primary: #1A1917;
-    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-primary-foreground: #ffffff;
     --sidebar-accent: #F0EFED;
     --sidebar-accent-foreground: #1A1917;
     --sidebar-border: #E4E3E0;
@@ -99,8 +94,9 @@
     --sidebar-width: 220px;
     --sidebar-width-icon: 56px;
 
-    --hc-white: #FFFFFF;
-    --hc-gray-50: #F8F8F7;
+    /* Hub Casa palette */
+    --hc-white:    #FFFFFF;
+    --hc-gray-50:  #F8F8F7;
     --hc-gray-100: #F0EFED;
     --hc-gray-200: #E4E3E0;
     --hc-gray-300: #C8C7C3;
@@ -108,23 +104,32 @@
     --hc-gray-500: #6B6A67;
     --hc-gray-700: #3D3C3A;
     --hc-gray-900: #1A1917;
-    --hc-black: #0D0C0B;
-    --hc-blue: #2563EB;
-    --hc-purple: #7C3AED;
-    --hc-amber: #D97706;
-    --hc-green: #059669;
-    --hc-red: #DC2626;
+    --hc-black:    #0D0C0B;
+    --hc-blue:     #2563EB;
+    --hc-purple:   #7C3AED;
+    --hc-amber:    #D97706;
+    --hc-green:    #059669;
+    --hc-red:      #DC2626;
 }
-
-/* Dark mode removido — design Hub Casa é light-only */
 
 @layer base {
     * {
-        @apply border-border;
+        @apply border-border outline-ring/50;
     }
-
     body {
+        font-family: var(--font-sans);
         @apply bg-background text-foreground;
-        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
     }
+    html {
+        font-size: var(--font-size);
+    }
+    h1 { font-size: 38px; font-weight: 600; line-height: 1.1; }
+    h2 { font-size: 28px; font-weight: 600; line-height: 1.2; }
+    h3 { font-size: 20px; font-weight: 500; line-height: 1.3; }
+    h4 { font-size: 16px; font-weight: 500; line-height: 1.5; }
+    label { font-size: 14px; font-weight: var(--font-weight-medium); line-height: 1.5; }
+    button { font-size: 14px; font-weight: var(--font-weight-medium); line-height: 1.5; }
+    input { font-size: 14px; font-weight: var(--font-weight-normal); line-height: 1.5; }
 }

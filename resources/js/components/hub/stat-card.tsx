@@ -7,29 +7,31 @@ export function StatCard({
     caption,
     accent,
     children,
+    className = '',
 }: {
     label: string;
     value: ReactNode;
     caption?: ReactNode;
     accent?: string;
     children?: ReactNode;
+    className?: string;
 }) {
     return (
-        <div className="flex h-full flex-col gap-3 rounded-xl border border-[var(--hc-gray-200)] bg-white p-4">
-            <span className="text-xs uppercase tracking-[0.08em] text-[var(--hc-gray-400)]">
+        /* Figma: bg-white border border-[#E4E3E0] rounded-[12px] p-5 */
+        <div className={cn('flex flex-col gap-2 rounded-[12px] border border-[#E4E3E0] bg-white p-5', className)}>
+            {/* label: text-xs uppercase tracking-wide text-[#9B9A96] mb-2 */}
+            <p className="text-xs uppercase tracking-wide text-[#9B9A96]">
                 {label}
-            </span>
+            </p>
+            {/* value: text-[28px] font-semibold font-mono leading-none */}
             <div
-                className={cn(
-                    'text-[28px] font-semibold font-mono leading-none',
-                    accent ? '' : 'text-[var(--hc-gray-900)]',
-                )}
-                style={accent ? { color: accent } : undefined}
+                className="font-mono text-[28px] font-semibold leading-none"
+                style={{ color: accent ?? '#1A1917' }}
             >
                 {value}
             </div>
             {caption && (
-                <div className="text-xs text-[var(--hc-gray-400)]">
+                <div className="font-mono text-xs" style={{ color: '#9B9A96' }}>
                     {caption}
                 </div>
             )}

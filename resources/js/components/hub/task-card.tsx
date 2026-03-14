@@ -1,6 +1,5 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AvatarStack } from '@/components/hub/avatar-stack';
 
@@ -13,7 +12,6 @@ type TaskCardProps = {
     onToggle?: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
-    /** Quando true renderiza como overlay (não aplica transform/transition) */
     overlay?: boolean;
 };
 
@@ -25,7 +23,6 @@ export function TaskCard({
     assignees,
     onToggle,
     onEdit,
-    onDelete,
     overlay = false,
 }: TaskCardProps) {
     const {
@@ -39,82 +36,105 @@ export function TaskCard({
 
     const style = overlay
         ? {}
-        : {
-              transform: CSS.Transform.toString(transform),
-              transition,
-          };
+        : { transform: CSS.Transform.toString(transform), transition };
 
     return (
+        /* Figma TaskCard: rounded-[8px], border-left 3px, cursor grab, bg based on completed */
         <div
             ref={setNodeRef}
+            onClick={() => onEdit?.()}
             style={{
                 ...style,
-                borderLeftWidth: 3,
-                borderLeftColor: color ?? '#7C3AED',
                 opacity: isDragging ? 0.4 : 1,
+                borderLeft: `3px solid ${color ?? '#7C3AED'}`,
+                borderTop: '1px solid #E4E3E0',
+                borderRight: '1px solid #E4E3E0',
+                borderBottom: '1px solid #E4E3E0',
+                background: completed ? '#F8F8F7' : 'white',
+                transform: isDragging
+                    ? `${CSS.Transform.toString(transform)} scale(1.02)`
+                    : CSS.Transform.toString(transform),
+                cursor: isDragging ? 'grabbing' : 'grab',
+                transition: overlay ? undefined : transition,
             }}
             className={cn(
-                'rounded-md border border-[var(--hc-gray-200)] bg-white p-3 text-sm',
-                completed && 'opacity-60',
+                'rounded-[8px] px-3 py-2.5 mb-2 select-none',
                 isDragging && 'shadow-lg',
             )}
+            {...attributes}
+            {...listeners}
         >
-            <div className="flex items-start gap-2">
+            {/* Title row */}
+            <div className="mb-2 flex items-start justify-between gap-1">
+                <span
+                    className={cn(
+                        'flex-1 text-sm leading-snug',
+                        completed
+                            ? 'line-through text-[#9B9A96] opacity-50'
+                            : 'text-[#1A1917]',
+                    )}
+                >
+                    {title}
+                </span>
+            </div>
+
+            {/* Bottom row: avatars + circular checkbox */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center -space-x-1">
+                    {assignees.slice(0, 3).map((a) => {
+                        const initials = a.name
+                            .split(' ')
+                            .map((w) => w[0])
+                            .join('')
+                            .slice(0, 2)
+                            .toUpperCase();
+                        return (
+                            <div
+                                key={a.id}
+                                className="flex items-center justify-center rounded-full border border-white bg-[#1A1917] font-medium text-white"
+                                style={{ width: 20, height: 20, fontSize: 8 }}
+                            >
+                                {initials}
+                            </div>
+                        );
+                    })}
+                    {assignees.length > 3 && (
+                        <div
+                            className="flex items-center justify-center rounded-full border border-white bg-[#F0EFED] text-[#6B6A67]"
+                            style={{ width: 20, height: 20, fontSize: 8 }}
+                        >
+                            +{assignees.length - 3}
+                        </div>
+                    )}
+                </div>
+
+                {/* Circular checkbox — exactly like figma */}
                 <button
                     type="button"
-                    {...attributes}
-                    {...listeners}
-                    className="mt-0.5 cursor-grab touch-none text-[var(--hc-gray-300)] hover:text-[var(--hc-gray-500)] active:cursor-grabbing"
-                    tabIndex={-1}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggle?.();
+                    }}
+                    className={cn(
+                        'flex size-4 items-center justify-center rounded-full border transition-colors',
+                        completed
+                            ? 'border-[#7C3AED] bg-[#7C3AED]'
+                            : 'border-[#E4E3E0] hover:border-[#7C3AED]',
+                    )}
                 >
-                    <GripVertical className="size-3.5" />
+                    {completed && (
+                        <svg width="7" height="5" viewBox="0 0 7 5" fill="none">
+                            <path
+                                d="M1 2.5L2.8 4L6 1"
+                                stroke="white"
+                                strokeWidth="1.2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                    )}
                 </button>
-                <div className="flex flex-1 items-start justify-between gap-2">
-                    <button
-                        type="button"
-                        onClick={onEdit}
-                        className={cn(
-                            'text-left font-medium text-[var(--hc-gray-900)]',
-                            completed && 'line-through',
-                        )}
-                    >
-                        {title}
-                    </button>
-                    <div className="flex shrink-0 items-center gap-1">
-                        {onEdit && (
-                            <button
-                                type="button"
-                                onClick={onEdit}
-                                className="text-[var(--hc-gray-300)] hover:text-[var(--hc-gray-600)]"
-                                tabIndex={-1}
-                            >
-                                <Pencil className="size-3.5" />
-                            </button>
-                        )}
-                        {onDelete && (
-                            <button
-                                type="button"
-                                onClick={onDelete}
-                                className="text-[var(--hc-gray-300)] hover:text-[var(--hc-red)]"
-                                tabIndex={-1}
-                            >
-                                <Trash2 className="size-3.5" />
-                            </button>
-                        )}
-                        <input
-                            type="checkbox"
-                            checked={completed}
-                            onChange={onToggle}
-                            className="mt-0.5 size-4 shrink-0 rounded border-[var(--hc-gray-300)]"
-                        />
-                    </div>
-                </div>
             </div>
-            {assignees.length > 0 && (
-                <div className="mt-2 pl-5">
-                    <AvatarStack users={assignees} size={20} />
-                </div>
-            )}
         </div>
     );
 }

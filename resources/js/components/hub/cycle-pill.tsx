@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 
+/* Exact from figma: CyclePill uses font-mono, EFF6FF/2563EB or F0EFED/6B6A67 */
 export function CyclePill({
     label,
     className,
@@ -7,19 +8,20 @@ export function CyclePill({
     label: string;
     className?: string;
 }) {
-    const isFlexible = label.toLowerCase().includes('sem data');
-
+    const isSemData = !label || label.toLowerCase().includes('sem data');
     return (
         <span
             className={cn(
-                'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                isFlexible
-                    ? 'bg-[#F2F4F7] text-[#667085]'
-                    : 'bg-[#EFF6FF] text-[#2563EB]',
+                'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-mono font-medium',
                 className,
             )}
+            style={
+                isSemData
+                    ? { background: '#F0EFED', color: '#6B6A67' }
+                    : { background: '#EFF6FF', color: '#2563EB' }
+            }
         >
-            {label}
+            {label || 'Sem data'}
         </span>
     );
 }

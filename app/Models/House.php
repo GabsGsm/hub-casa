@@ -40,4 +40,19 @@ class House extends Model
     {
         return $this->hasMany(Task::class);
     }
+
+    public function agendaEvents(): HasMany
+    {
+        return $this->hasMany(AgendaEvent::class);
+    }
+
+    public function shoppingLists(): HasMany
+    {
+        return $this->hasMany(ShoppingList::class);
+    }
+
+    public function pantryItems(): HasMany
+    {
+        return $this->hasMany(PantryItem::class);
+    }
 }

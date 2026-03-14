@@ -1,68 +1,42 @@
-// Components
 import { Form, Head } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
 import { login } from '@/routes';
 import { email } from '@/routes/password';
 
 export default function ForgotPassword({ status }: { status?: string }) {
     return (
-        <AuthLayout
-            title="Forgot password"
-            description="Enter your email to receive a password reset link"
-        >
-            <Head title="Forgot password" />
-
+        <AuthLayout title="Esqueci minha senha" description="Digite seu e-mail para receber o link de redefinição">
+            <Head title="Esqueci minha senha" />
             {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
+                <div className="mb-4 rounded-[8px] bg-[#F0FDF4] px-4 py-3 text-center text-sm font-medium text-[#15803D]">
                     {status}
                 </div>
             )}
-
-            <div className="space-y-6">
-                <Form {...email.form()}>
-                    {({ processing, errors }) => (
-                        <>
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    autoComplete="off"
-                                    autoFocus
-                                    placeholder="email@example.com"
-                                />
-
-                                <InputError message={errors.email} />
-                            </div>
-
-                            <div className="my-6 flex items-center justify-start">
-                                <Button
-                                    className="w-full"
-                                    disabled={processing}
-                                    data-test="email-password-reset-link-button"
-                                >
-                                    {processing && (
-                                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                                    )}
-                                    Email password reset link
-                                </Button>
-                            </div>
-                        </>
-                    )}
-                </Form>
-
-                <div className="space-x-1 text-center text-sm text-muted-foreground">
-                    <span>Or, return to</span>
-                    <TextLink href={login()}>log in</TextLink>
-                </div>
-            </div>
+            <Form {...email.form()} className="flex flex-col gap-5">
+                {({ processing, errors }) => (
+                    <>
+                        <div className="flex flex-col gap-1.5">
+                            <Label className="text-sm font-medium text-[#3D3C3A]">E-mail</Label>
+                            <Input type="email" name="email" autoComplete="off" autoFocus placeholder="seu@email.com" />
+                            <InputError message={errors.email} />
+                        </div>
+                        <Button className="w-full" disabled={processing}>
+                            {processing && <Spinner />}
+                            Enviar link de redefinição
+                        </Button>
+                    </>
+                )}
+            </Form>
+            <p className="mt-5 text-center text-sm text-[#9B9A96]">
+                Lembrou a senha?{' '}
+                <TextLink href={login()}>Entrar</TextLink>
+            </p>
         </AuthLayout>
     );
 }
