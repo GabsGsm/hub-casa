@@ -5,15 +5,17 @@ import type { User } from '@/types';
 export function UserInfo({
     user,
     showEmail = false,
+    subtitle,
 }: {
     user: User;
     showEmail?: boolean;
+    subtitle?: string | null;
 }) {
     const getInitials = useInitials();
 
     return (
         <>
-            <Avatar className="h-8 w-8 overflow-hidden rounded-full">
+            <Avatar className="h-7 w-7 overflow-hidden rounded-full">
                 <AvatarImage src={user.avatar} alt={user.name} />
                 <AvatarFallback className="rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white">
                     {getInitials(user.name)}
@@ -24,6 +26,11 @@ export function UserInfo({
                 {showEmail && (
                     <span className="truncate text-xs text-muted-foreground">
                         {user.email}
+                    </span>
+                )}
+                {!showEmail && subtitle && (
+                    <span className="truncate text-xs text-muted-foreground">
+                        {subtitle}
                     </span>
                 )}
             </div>

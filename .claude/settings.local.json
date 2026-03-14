@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /tmp)",
+      "Bash(unzip -q \"c:\\\\Users\\\\raku_\\\\Desktop\\\\Vulpi Studio\\\\hub-casa\\\\hub-casa-figma.zip\")",
+      "Bash(mkdir -p /tmp/figma-extract)",
+      "Read(//tmp/**)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(php artisan:*)"
+    ]
+  }
+}

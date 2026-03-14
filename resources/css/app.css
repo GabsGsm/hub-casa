@@ -5,13 +5,14 @@
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
-@custom-variant dark (&:is(.dark *));
-
 @theme {
     --font-sans:
-        'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+        'Geist', 'Inter', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+    --font-mono:
+        'Geist Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo,
+        Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -62,75 +63,60 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.87 0 0);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.87 0 0);
+    --background: #F8F8F7;
+    --foreground: #1A1917;
+    --card: #FFFFFF;
+    --card-foreground: #1A1917;
+    --popover: #FFFFFF;
+    --popover-foreground: #1A1917;
+    --primary: #1A1917;
+    --primary-foreground: #FFFFFF;
+    --secondary: #F0EFED;
+    --secondary-foreground: #1A1917;
+    --muted: #F0EFED;
+    --muted-foreground: #9B9A96;
+    --accent: #F0EFED;
+    --accent-foreground: #1A1917;
+    --destructive: #DC2626;
+    --destructive-foreground: #FFFFFF;
+    --border: #E4E3E0;
+    --input: #E4E3E0;
+    --ring: #C8C7C3;
+    --chart-1: #2563EB;
+    --chart-2: #7C3AED;
+    --chart-3: #059669;
+    --chart-4: #D97706;
+    --chart-5: #DC2626;
+    --radius: 0.75rem;
+    --sidebar: #FFFFFF;
+    --sidebar-foreground: #1A1917;
+    --sidebar-primary: #1A1917;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #F0EFED;
+    --sidebar-accent-foreground: #1A1917;
+    --sidebar-border: #E4E3E0;
+    --sidebar-ring: #C8C7C3;
+    --sidebar-width: 220px;
+    --sidebar-width-icon: 56px;
+
+    --hc-white: #FFFFFF;
+    --hc-gray-50: #F8F8F7;
+    --hc-gray-100: #F0EFED;
+    --hc-gray-200: #E4E3E0;
+    --hc-gray-300: #C8C7C3;
+    --hc-gray-400: #9B9A96;
+    --hc-gray-500: #6B6A67;
+    --hc-gray-700: #3D3C3A;
+    --hc-gray-900: #1A1917;
+    --hc-black: #0D0C0B;
+    --hc-blue: #2563EB;
+    --hc-purple: #7C3AED;
+    --hc-amber: #D97706;
+    --hc-green: #059669;
+    --hc-red: #DC2626;
 }
 
-.dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.145 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.145 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.396 0.141 25.723);
-    --destructive-foreground: oklch(0.637 0.237 25.331);
-    --border: oklch(0.269 0 0);
-    --input: oklch(0.269 0 0);
-    --ring: oklch(0.439 0 0);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.985 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.269 0 0);
-    --sidebar-ring: oklch(0.439 0 0);
-}
+/* Dark mode removido — design Hub Casa é light-only */
 
 @layer base {
     * {
@@ -139,5 +125,6 @@
 
     body {
         @apply bg-background text-foreground;
+        font-size: 14px;
     }
 }

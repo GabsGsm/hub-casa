@@ -23,6 +23,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'house_id',
+        'role',
     ];
 
     /**
@@ -49,5 +51,40 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    public function house()
+    {
+        return $this->belongsTo(House::class);
+    }
+
+    public function paymentCycles()
+    {
+        return $this->hasMany(PaymentCycle::class);
+    }
+
+    public function financialTransactions()
+    {
+        return $this->hasMany(FinancialTransaction::class, 'created_by');
+    }
+
+    public function assignedFinancialTransactions()
+    {
+        return $this->belongsToMany(FinancialTransaction::class, 'financial_transaction_user');
+    }
+
+    public function tasks()
+    {
+        return $this->hasMany(Task::class, 'created_by');
+    }
+
+    public function assignedTasks()
+    {
+        return $this->belongsToMany(Task::class, 'task_user');
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
     }
 }
