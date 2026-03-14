@@ -22,7 +22,7 @@ class ComprasController extends Controller
 
         $items = ShoppingList::query()
             ->where('house_id', $house->id)
-            ->orderByRaw("status = 'comprado'")
+            ->orderByRaw("CASE WHEN status = 'pendente' THEN 0 WHEN status = 'impossibilitado' THEN 1 ELSE 2 END")
             ->orderBy('created_at')
             ->get()
             ->map(function (ShoppingList $item) {

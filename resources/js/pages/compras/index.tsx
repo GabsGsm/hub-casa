@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Check, Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { Ban, Check, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { ProgressBar } from '@/components/hub/progress-bar';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,7 @@ type ComprasProps = {
     items: ShoppingItem[];
 };
 
-type Filter = 'todos' | 'pendente' | 'comprado';
+type Filter = 'todos' | 'pendente' | 'comprado' | 'impossibilitado';
 
 const UNIT_OPTIONS = ['un', 'kg', 'g', 'l', 'ml', 'cx', 'pct', 'dz'];
 const CATEGORY_OPTIONS = ['Alimentação', 'Limpeza', 'Higiene', 'Pet', 'Bebidas', 'Outros'];
@@ -72,6 +72,7 @@ export default function Compras({ items }: ComprasProps) {
 
     const pendentes = filtered.filter((i) => i.status === 'pendente');
     const comprados = filtered.filter((i) => i.status === 'comprado');
+    const impossibilitados = filtered.filter((i) => i.status === 'impossibilitado');
 
     // ── Handlers ──────────────────────────────────────────────────────────────
     function handleInlineAdd(e: React.FormEvent) {
@@ -120,37 +121,42 @@ export default function Compras({ items }: ComprasProps) {
         { key: 'todos', label: 'Todos', count: total },
         { key: 'pendente', label: 'Pendentes', count: items.filter(i => i.status === 'pendente').length },
         { key: 'comprado', label: 'Comprados', count: done },
+        { key: 'impossibilitado', label: 'Impeditivos', count: items.filter(i => i.status === 'impossibilitado').length },
     ];
 
     // ── Item Row ──────────────────────────────────────────────────────────────
     function ItemRow({ item }: { item: ShoppingItem }) {
         const isPurchased = item.status === 'comprado';
+        const isBlocked = item.status === 'impossibilitado';
         return (
             <div
                 className="group flex cursor-pointer items-center gap-3 rounded-[8px] px-3 py-2.5 transition-colors hover:bg-[#F8F8F7]"
                 onClick={() => openEdit(item)}
             >
-                {/* Checkbox */}
+                {/* Checkbox / blocked icon */}
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); toggleStatus(item); }}
                     className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
                         isPurchased
                             ? 'border-[#059669] bg-[#059669]'
-                            : 'border-[#E4E3E0] hover:border-[#059669]'
+                            : isBlocked
+                              ? 'border-[#D97706] bg-[#D97706]'
+                              : 'border-[#E4E3E0] hover:border-[#059669]'
                     }`}
                 >
                     {isPurchased && <Check size={10} strokeWidth={3} className="text-white" />}
+                    {isBlocked && <Ban size={10} strokeWidth={3} className="text-white" />}
                 </button>
 
                 {/* Priority dot */}
-                {item.priority === 'high' && !isPurchased && (
+                {item.priority === 'high' && !isPurchased && !isBlocked && (
                     <div className="size-1.5 shrink-0 rounded-full bg-[#DC2626]" />
                 )}
 
                 {/* Name + meta */}
                 <div className="min-w-0 flex-1">
-                    <span className={`text-sm ${isPurchased ? 'text-[#9B9A96] line-through' : 'text-[#1A1917]'}`}>
+                    <span className={`text-sm ${isPurchased ? 'text-[#9B9A96] line-through' : isBlocked ? 'text-[#D97706]' : 'text-[#1A1917]'}`}>
                         {item.name}
                     </span>
                     <div className="flex items-center gap-2">
@@ -275,10 +281,26 @@ export default function Compras({ items }: ComprasProps) {
                                 </div>
                             )}
 
+                            {/* Impossibilitados */}
+                            {impossibilitados.length > 0 && (
+                                <div>
+                                    <div className={`border-b border-[#E4E3E0] bg-[#FFFBEB] px-5 py-2 ${pendentes.length > 0 ? 'border-t' : ''}`}>
+                                        <span className="text-xs font-medium uppercase tracking-wide text-[#D97706]">
+                                            Impeditivos · {impossibilitados.length}
+                                        </span>
+                                    </div>
+                                    <div className="p-2">
+                                        {impossibilitados.map((item) => (
+                                            <ItemRow key={item.id} item={item} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Comprados */}
                             {comprados.length > 0 && (
                                 <div>
-                                    <div className={`border-b border-[#E4E3E0] bg-[#F0FDF4] px-5 py-2 ${pendentes.length > 0 ? 'border-t' : ''}`}>
+                                    <div className={`border-b border-[#E4E3E0] bg-[#F0FDF4] px-5 py-2 ${pendentes.length > 0 || impossibilitados.length > 0 ? 'border-t' : ''}`}>
                                         <span className="text-xs font-medium uppercase tracking-wide text-[#15803D]">
                                             Comprados · {comprados.length}
                                         </span>
