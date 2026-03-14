@@ -35,7 +35,7 @@ type DashboardProps = {
         title: string;
         amount: number;
         type: string;
-        due_date: string | null;
+        effective_date: string;
         category: { name: string; color: string | null } | null;
     }[];
     tasksToday: {
@@ -144,7 +144,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                         value={`R$ ${fmt(stats.payable.amount)}`}
                         caption={
                             <span style={{ color: '#DC2626' }}>
-                                {stats.payable.count} contas · vence hoje
+                                {stats.payable.count} {stats.payable.count === 1 ? 'conta' : 'contas'} · este mês
                             </span>
                         }
                     />
@@ -189,11 +189,16 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                                         className="flex items-center gap-4 border-b border-[#E4E3E0] px-5 last:border-0"
                                         style={{ height: 48 }}
                                     >
-                                        <span className="w-12 shrink-0 font-mono text-sm text-[#6B6A67]">
+                                        <span className={`w-20 shrink-0 font-mono text-sm ${c.id === 0 ? 'text-[#9B9A96] italic' : 'text-[#6B6A67]'}`}>
                                             {c.name}
                                         </span>
                                         <div className="flex-1">
-                                            <ProgressBar value={c.paid} max={c.expected_amount || 1} height={6} />
+                                            <ProgressBar
+                                                value={c.paid}
+                                                max={c.id === 0 ? (c.paid + c.pending) || 1 : c.expected_amount || 1}
+                                                height={6}
+                                                color={c.id === 0 ? '#9B9A96' : undefined}
+                                            />
                                         </div>
                                         <span className="hidden w-24 shrink-0 text-right font-mono text-sm text-[#059669] sm:block">
                                             R$ {fmt(c.paid)}
@@ -203,21 +208,11 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                                         </span>
                                     </div>
                                 ))}
-                                {/* Sem data row */}
-                                <div className="flex items-center gap-4 px-5" style={{ height: 48 }}>
-                                    <span className="w-12 shrink-0 rounded-full bg-[#F0EFED] px-2 py-0.5 text-center font-mono text-xs text-[#9B9A96]">
-                                        Sem dt.
-                                    </span>
-                                    <div className="flex-1">
-                                        <ProgressBar value={0} max={1} height={6} color="#9B9A96" />
+                                {cycles.length === 0 && (
+                                    <div className="px-5 py-4 text-sm text-[#9B9A96]">
+                                        Nenhum ciclo de pagamento cadastrado.
                                     </div>
-                                    <span className="hidden w-24 shrink-0 text-right font-mono text-sm text-[#9B9A96] sm:block">
-                                        R$ 0,00
-                                    </span>
-                                    <span className="hidden w-24 shrink-0 text-right font-mono text-sm text-[#9B9A96] sm:block">
-                                        R$ 0,00
-                                    </span>
-                                </div>
+                                )}
                             </div>
                         </div>
 
@@ -241,7 +236,11 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                                             className="size-2 shrink-0 rounded-full"
                                             style={{
                                                 background:
-                                                    item.type === 'ganho' ? '#059669' : '#2563EB',
+                                                    item.type === 'ganho'
+                                                        ? '#059669'
+                                                        : item.type === 'divida'
+                                                          ? '#DC2626'
+                                                          : '#2563EB',
                                             }}
                                         />
                                         <div className="min-w-0 flex-1">
@@ -257,9 +256,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                                             >
                                                 {item.type === 'ganho' ? '+' : ''}R$ {fmt(Math.abs(item.amount))}
                                             </p>
-                                            {item.due_date && (
-                                                <p className="font-mono text-xs text-[#9B9A96]">{item.due_date}</p>
-                                            )}
+                                            <p className="font-mono text-xs text-[#9B9A96]">{item.effective_date}</p>
                                         </div>
                                     </div>
                                 ))}

@@ -28,13 +28,36 @@ class DashboardController extends Controller
             ->orderBy('day_of_month')
             ->get();
 
-        $cycleTransactions = FinancialTransaction::query()
-            ->where('house_id', $house->id)
-            ->get()
-            ->groupBy('payment_cycle_id');
+        // Resolve transactions for the current month (mirrors JS resolveTransactionsForMonth)
+        $now = Carbon::now();
+        $cy = $now->year;
+        $cm = $now->month;
 
-        $cyclesPayload = $cycles->map(function (PaymentCycle $cycle) use ($cycleTransactions) {
-            $transactions = $cycleTransactions->get($cycle->id, collect());
+        $allTransactions = FinancialTransaction::query()
+            ->where('house_id', $house->id)
+            ->get();
+
+        $currentMonthFlat = $allTransactions->filter(function (FinancialTransaction $t) use ($cy, $cm) {
+            $effectiveDate = Carbon::parse($t->due_date ?? $t->created_at);
+            $oy = $effectiveDate->year;
+            $om = $effectiveDate->month;
+
+            if ($t->recurrence === 'mensal') {
+                return true;
+            }
+
+            if ($t->type === FinancialTransaction::TYPE_DEBT && $t->installments_count) {
+                $installNum = ($cy - $oy) * 12 + ($cm - $om); // 0-based
+                return $installNum >= 0 && $installNum < $t->installments_count;
+            }
+
+            return $oy === $cy && $om === $cm;
+        });
+
+        $currentMonthTx = $currentMonthFlat->groupBy('payment_cycle_id');
+
+        $cyclesPayload = $cycles->map(function (PaymentCycle $cycle) use ($currentMonthTx) {
+            $transactions = $currentMonthTx->get($cycle->id, collect());
 
             $paid = $transactions->where('status', FinancialTransaction::STATUS_PAID)
                 ->where('type', '!=', FinancialTransaction::TYPE_INCOME)
@@ -53,6 +76,24 @@ class DashboardController extends Controller
                 'pending' => (float) $pending,
             ];
         });
+
+        // Adiciona entrada "Sem ciclo" para transações sem payment_cycle_id
+        $noCycleTx = $currentMonthFlat->filter(fn ($t) => $t->payment_cycle_id === null);
+        $noCyclePaid = $noCycleTx->where('status', FinancialTransaction::STATUS_PAID)
+            ->where('type', '!=', FinancialTransaction::TYPE_INCOME)->sum('amount');
+        $noCyclePending = $noCycleTx->where('status', '!=', FinancialTransaction::STATUS_PAID)
+            ->where('type', '!=', FinancialTransaction::TYPE_INCOME)->sum('amount');
+
+        if ($noCyclePaid > 0 || $noCyclePending > 0) {
+            $cyclesPayload->push([
+                'id'              => 0,
+                'name'            => 'Sem ciclo',
+                'day_of_month'    => null,
+                'expected_amount' => 0.0,
+                'paid'            => (float) $noCyclePaid,
+                'pending'         => (float) $noCyclePending,
+            ]);
+        }
 
         $activeCycle = $this->resolveActiveCycle($cyclesPayload);
 
@@ -81,12 +122,12 @@ class DashboardController extends Controller
         $tasksTotal = Task::query()->where('house_id', $house->id)->count();
         $tasksDone = Task::query()->where('house_id', $house->id)->where('completed', true)->count();
 
-        $dueToday = FinancialTransaction::query()
-            ->where('house_id', $house->id)
-            ->whereDate('due_date', $today)
-            ->where('status', '!=', FinancialTransaction::STATUS_PAID)
-            ->where('type', '!=', FinancialTransaction::TYPE_INCOME)
-            ->get();
+        // "A Pagar": gastos/dívidas do mês atual ainda não pagos
+        $dueToday = $currentMonthFlat->filter(
+            fn (FinancialTransaction $t) =>
+                $t->status !== FinancialTransaction::STATUS_PAID &&
+                $t->type !== FinancialTransaction::TYPE_INCOME
+        );
 
         $recentTransactions = FinancialTransaction::query()
             ->with('category:id,name,color')
@@ -96,12 +137,13 @@ class DashboardController extends Controller
             ->limit(5)
             ->get()
             ->map(function (FinancialTransaction $transaction) {
+                $effectiveDate = $transaction->due_date ?? $transaction->created_at;
                 return [
                     'id' => $transaction->id,
                     'title' => $transaction->title,
                     'amount' => (float) $transaction->amount,
                     'type' => $transaction->type,
-                    'due_date' => optional($transaction->due_date)->format('d/m'),
+                    'effective_date' => Carbon::parse($effectiveDate)->format('d/m'),
                     'category' => $transaction->category ? [
                         'name' => $transaction->category->name,
                         'color' => $transaction->category->color,

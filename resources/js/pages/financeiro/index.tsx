@@ -652,14 +652,15 @@ export default function Financeiro({ cycles, transactions, categories, members }
         [currentMonthTx],
     );
 
-    /** Paid/pending por ciclo — calculados do mês atual */
+    /** Paid/pending por ciclo — calculados do mês atual. Key 0 = sem ciclo */
     const cycleMthTotals = useMemo(() => {
         const map: Record<number, { paid: number; pending: number }> = {};
         currentMonthTx.forEach((t) => {
-            if (!t.cycle || t.type === 'ganho') return;
-            if (!map[t.cycle.id]) map[t.cycle.id] = { paid: 0, pending: 0 };
-            if (t.status === 'pago') map[t.cycle.id].paid += t.amount;
-            else map[t.cycle.id].pending += t.amount;
+            if (t.type === 'ganho') return;
+            const key = t.cycle ? t.cycle.id : 0;
+            if (!map[key]) map[key] = { paid: 0, pending: 0 };
+            if (t.status === 'pago') map[key].paid += t.amount;
+            else map[key].pending += t.amount;
         });
         return map;
     }, [currentMonthTx]);
@@ -1017,6 +1018,35 @@ export default function Financeiro({ cycles, transactions, categories, members }
                                     </div>
                                 );
                             })}
+
+                            {/* Card sem ciclo */}
+                            {cycleMthTotals[0] && (cycleMthTotals[0].paid > 0 || cycleMthTotals[0].pending > 0) && (() => {
+                                const noCycle = cycleMthTotals[0];
+                                const total = noCycle.paid + noCycle.pending;
+                                return (
+                                    <div className="overflow-hidden rounded-[12px] border border-dashed border-[#E4E3E0] bg-white p-5">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`size-2 rounded-full ${noCycle.pending > 0 ? 'bg-[#D97706]' : 'bg-[#059669]'}`} />
+                                                    <span className="text-sm font-medium text-[#9B9A96]">Sem ciclo</span>
+                                                </div>
+                                                <div className="mt-0.5 font-mono text-xs text-[#9B9A96]">Sem data fixa</div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 font-mono text-[32px] font-semibold leading-none text-[#9B9A96]">
+                                            {currency.format(total)}
+                                        </div>
+                                        <div className="mt-4">
+                                            <ProgressBar value={noCycle.paid} max={total || 1} height={6} color="#9B9A96" />
+                                        </div>
+                                        <div className="mt-3 flex items-center justify-between text-xs">
+                                            <span className="font-mono text-[#059669]">Pago: {currency.format(noCycle.paid)}</span>
+                                            <span className="font-mono text-[#D97706]">Pendente: {currency.format(noCycle.pending)}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Card totais do mês */}
                             <div className="rounded-[12px] border border-[#E4E3E0] bg-[#F8F8F7] p-5">
