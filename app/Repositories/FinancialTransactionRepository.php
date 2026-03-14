@@ -53,7 +53,10 @@ class FinancialTransactionRepository
      */
     public function update(FinancialTransaction $transaction, array $data, ?array $assigneeIds): FinancialTransaction
     {
-        $transaction->fill(array_filter($data, fn ($value) => $value !== null));
+        // Atualiza apenas os campos presentes no payload; permite valores null (ex: limpar recorrência)
+        $allowed = ['title', 'amount', 'type', 'status', 'due_date', 'payment_cycle_id',
+                    'category_id', 'recurrence', 'installments_count'];
+        $transaction->fill(array_intersect_key($data, array_flip($allowed)));
         $transaction->save();
 
         if ($assigneeIds !== null) {

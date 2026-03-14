@@ -16,10 +16,8 @@ class FinancialTransaction extends Model
     public const STATUS_IMPOSSIBLE = 'impossibilitado';
 
     public const TYPE_EXPENSE = 'gasto';
-    public const TYPE_INCOME = 'ganho';
-    public const TYPE_DEBT = 'divida';
-    public const TYPE_LOAN = 'emprestimo';
-    public const TYPE_IOU = 'afiado';
+    public const TYPE_INCOME  = 'ganho';
+    public const TYPE_DEBT    = 'divida';
 
     protected $fillable = [
         'house_id',

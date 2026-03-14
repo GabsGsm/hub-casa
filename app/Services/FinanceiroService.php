@@ -172,6 +172,7 @@ class FinanceiroService
             'amount'             => (float) $t->amount,
             'type'               => $t->type,
             'status'             => $t->status,
+            'created_at'         => $t->created_at->format('Y-m-d'),
             'due_date'           => optional($t->due_date)->format('Y-m-d'),
             'recurrence'         => $t->recurrence,
             'installments_count' => $t->installments_count,
