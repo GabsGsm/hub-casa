@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\HouseSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use Illuminate\Support\Facades\Route;
@@ -21,4 +22,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
+
+    // Configurações da casa (somente admin)
+    Route::get('settings/casa', [HouseSettingsController::class, 'edit'])->name('house-settings.edit');
+    Route::patch('settings/casa', [HouseSettingsController::class, 'update'])->name('house-settings.update');
+    Route::patch('settings/casa/membros/{member}', [HouseSettingsController::class, 'updateMember'])->name('house-settings.update-member');
+    Route::delete('settings/casa/membros/{member}', [HouseSettingsController::class, 'removeMember'])->name('house-settings.remove-member');
 });

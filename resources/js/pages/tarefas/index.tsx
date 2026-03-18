@@ -11,22 +11,14 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Plus, X } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { ConfirmDialog } from '@/components/hub/confirm-dialog';
 import { TaskCard } from '@/components/hub/task-card';
 import { TaskColumn } from '@/components/hub/task-column';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Sheet,
-    SheetContent,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { InlineAdd } from './components/inline-add';
+import { TaskEditSheet } from './components/task-edit-sheet';
+import { DAY_LABELS } from './constants';
 
 type Task = {
     id: number;
@@ -43,119 +35,44 @@ type TarefasProps = {
     house: { id: number; name: string };
     tasks: Task[];
     members: { id: number; name: string }[];
-    weekLabel: string;
 };
 
-const dayLabels = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM'];
-
-const colorPresets = ['#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626', '#6B6A67'];
-
-// ── Assignee Multi-select ──────────────────────────────────────────────────────
-function AssigneeSelect({
-    members,
-    selected,
-    onChange,
-}: {
-    members: { id: number; name: string }[];
-    selected: number[];
-    onChange: (ids: number[]) => void;
-}) {
-    function toggle(id: number) {
-        if (selected.includes(id)) {
-            onChange(selected.filter((s) => s !== id));
-        } else {
-            onChange([...selected, id]);
-        }
-    }
-    return (
-        <div className="flex flex-wrap gap-2">
-            {members.map((m) => {
-                const active = selected.includes(m.id);
-                const initials = m.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-                return (
-                    <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => toggle(m.id)}
-                        title={m.name}
-                        className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium transition-colors ${
-                            active
-                                ? 'border-[#7C3AED] bg-[#EDE9FE] text-[#7C3AED]'
-                                : 'border-[#E4E3E0] bg-white text-[#6B6A67] hover:border-[#C8C7C3]'
-                        }`}
-                    >
-                        <span
-                            className="flex size-4 items-center justify-center rounded-full text-white"
-                            style={{ fontSize: 8, background: active ? '#7C3AED' : '#9B9A96' }}
-                        >
-                            {initials}
-                        </span>
-                        {m.name.split(' ')[0]}
-                        {active && <X size={10} />}
-                    </button>
-                );
-            })}
-        </div>
-    );
+// ── Week helpers ──────────────────────────────────────────────────────────────
+function getWeekInfo(offset: number) {
+    const today = new Date();
+    const dow = (today.getDay() + 6) % 7;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - dow + offset * 7);
+    const days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        return d;
+    });
+    const start = days[0].getDate();
+    const end = days[6].getDate();
+    const month = days[0].toLocaleDateString('pt-BR', { month: 'long' });
+    return {
+        dateLabels: days.map((d) => d.getDate().toString()),
+        label: `${start}–${end} de ${month}`,
+    };
 }
 
-// ── Inline Add Row ──────────────────────────────────────────────────────────────
-function InlineAdd({
-    dayIndex,
-    onAdd,
-}: {
-    dayIndex: number;
-    onAdd: (title: string, dayIndex: number) => void;
-}) {
-    const [open, setOpen] = useState(false);
-    const [value, setValue] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!value.trim()) { setOpen(false); return; }
-        onAdd(value.trim(), dayIndex);
-        setValue('');
-        setOpen(false);
-    }
-
-    if (!open) {
-        return (
-            <button
-                type="button"
-                onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
-                className="flex w-full items-center gap-1.5 rounded-[6px] px-2 py-1.5 text-xs text-[#C8C7C3] transition-colors hover:bg-[#F0EFED] hover:text-[#9B9A96]"
-            >
-                <Plus size={12} />
-                Adicionar tarefa
-            </button>
-        );
-    }
-
-    return (
-        <form onSubmit={submit} className="flex items-center gap-1">
-            <Input
-                ref={inputRef}
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onBlur={() => { if (!value.trim()) setOpen(false); }}
-                onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
-                placeholder="Título da tarefa..."
-                className="h-7 text-xs"
-            />
-            <button type="submit" className="flex size-7 shrink-0 items-center justify-center rounded-[6px] bg-[#1A1917] text-white hover:bg-[#3D3C3A]">
-                <Plus size={12} />
-            </button>
-        </form>
-    );
-}
-
-// ── Main Component ────────────────────────────────────────────────────────────
-export default function Tarefas({ tasks: initialTasks, members, weekLabel }: TarefasProps) {
+export default function Tarefas({ tasks: initialTasks, members }: TarefasProps) {
     const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
+    const [dragOriginDay, setDragOriginDay] = useState<number | null>(null);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [editAssignees, setEditAssignees] = useState<number[]>([]);
+    const [weekOffset, setWeekOffset] = useState(0);
+    const [pendingDelete, setPendingDelete] = useState<{ action: () => void; label: string } | null>(null);
+
+    // Sync local state with server data after each successful Inertia visit
+    useEffect(() => {
+        setLocalTasks(initialTasks);
+    }, [initialTasks]);
+
+    const { dateLabels, label: weekLabel } = useMemo(() => getWeekInfo(weekOffset), [weekOffset]);
+    const todayDayIndex = useMemo(() => (new Date().getDay() + 6) % 7, []);
 
     const editForm = useForm({
         title: '',
@@ -178,28 +95,14 @@ export default function Tarefas({ tasks: initialTasks, members, weekLabel }: Tar
         return groups;
     }, [localTasks]);
 
-    const weekDates = useMemo(() => {
-        const today = new Date();
-        const dayIndex = (today.getDay() + 6) % 7;
-        const monday = new Date(today);
-        monday.setDate(today.getDate() - dayIndex);
-        return Array.from({ length: 7 }, (_, i) => {
-            const d = new Date(monday);
-            d.setDate(monday.getDate() + i);
-            return d.getDate().toString();
-        });
-    }, []);
-
-    const todayDayIndex = useMemo(() => (new Date().getDay() + 6) % 7, []);
-
-    // ── Inline add ───────────────────────────────────────────────────────────
+    // ── Inline add ────────────────────────────────────────────────────────────
     function handleInlineAdd(title: string, dayIndex: number) {
         router.post('/tarefas', { title, day_of_week: dayIndex, color: '#7C3AED' }, {
             preserveScroll: true,
         });
     }
 
-    // ── Edit ─────────────────────────────────────────────────────────────────
+    // ── Edit ──────────────────────────────────────────────────────────────────
     function startEdit(id: number) {
         const task = localTasks.find((t) => t.id === id);
         if (!task) return;
@@ -216,14 +119,11 @@ export default function Tarefas({ tasks: initialTasks, members, weekLabel }: Tar
     function submitEdit(e: React.FormEvent) {
         e.preventDefault();
         if (!editingTask) return;
-        router.put(
-            `/tarefas/${editingTask.id}`,
-            { ...editForm.data, assignee_ids: editAssignees },
-            {
-                preserveScroll: true,
-                onSuccess: () => setEditingTask(null),
-            },
-        );
+        editForm.transform((d) => ({ ...d, assignee_ids: editAssignees }));
+        editForm.put(`/tarefas/${editingTask.id}`, {
+            preserveScroll: true,
+            onSuccess: () => setEditingTask(null),
+        });
     }
 
     // ── Toggle + Delete ───────────────────────────────────────────────────────
@@ -235,14 +135,18 @@ export default function Tarefas({ tasks: initialTasks, members, weekLabel }: Tar
     }
 
     function deleteTask(id: number) {
-        if (!window.confirm('Remover esta tarefa?')) return;
-        router.delete(`/tarefas/${id}`, { preserveScroll: true });
+        const task = localTasks.find((t) => t.id === id);
+        setPendingDelete({
+            action: () => router.delete(`/tarefas/${id}`, { preserveScroll: true }),
+            label: task?.title ?? 'esta tarefa',
+        });
     }
 
-    // ── DnD ──────────────────────────────────────────────────────────────────
+    // ── DnD ───────────────────────────────────────────────────────────────────
     function handleDragStart(event: DragStartEvent) {
         const task = localTasks.find((t) => t.id === event.active.id);
         setActiveTask(task ?? null);
+        setDragOriginDay(task?.day_of_week ?? null);
     }
 
     function handleDragOver(event: DragOverEvent) {
@@ -264,6 +168,7 @@ export default function Tarefas({ tasks: initialTasks, members, weekLabel }: Tar
     function handleDragEnd(event: DragEndEvent) {
         const { active, over } = event;
         setActiveTask(null);
+        setDragOriginDay(null);
         if (!over) return;
         const activeId = active.id as number;
         const overId = over.id;
@@ -279,7 +184,11 @@ export default function Tarefas({ tasks: initialTasks, members, weekLabel }: Tar
         if (String(overId).startsWith('col-')) {
             newSortOrder = targetColumnTasks.length > 0 ? targetColumnTasks[targetColumnTasks.length - 1].sort_order + 1 : 0;
         } else if (activeId === Number(overId)) {
-            return;
+            // dropped on self — skip apenas se a coluna não mudou
+            if (activeTaskCurrent.day_of_week === dragOriginDay) return;
+            newSortOrder = targetColumnTasks.length > 0
+                ? targetColumnTasks[targetColumnTasks.length - 1].sort_order + 1
+                : 0;
         } else {
             const overIndex = targetColumnTasks.findIndex((t) => t.id === Number(overId));
             newSortOrder = overIndex !== -1 ? targetColumnTasks[overIndex].sort_order - 0.5 : targetColumnTasks.length > 0 ? targetColumnTasks[targetColumnTasks.length - 1].sort_order + 1 : 0;
@@ -319,7 +228,32 @@ export default function Tarefas({ tasks: initialTasks, members, weekLabel }: Tar
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <div className="text-[28px] font-semibold leading-tight text-[#1A1917]">Tarefas</div>
-                        <div className="font-mono text-sm text-[#9B9A96]">Semana {weekLabel}</div>
+                        <div className="font-mono text-sm text-[#9B9A96]">{weekLabel}</div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={() => setWeekOffset((w) => w - 1)}
+                            className="flex items-center gap-1 rounded-[6px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
+                        >
+                            ← Anterior
+                        </button>
+                        {weekOffset !== 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setWeekOffset(0)}
+                                className="rounded-[6px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
+                            >
+                                Hoje
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setWeekOffset((w) => w + 1)}
+                            className="flex items-center gap-1 rounded-[6px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
+                        >
+                            Próxima →
+                        </button>
                     </div>
                 </div>
 
@@ -333,19 +267,18 @@ export default function Tarefas({ tasks: initialTasks, members, weekLabel }: Tar
                 >
                     <div className="overflow-x-auto">
                         <div className="flex gap-2 pb-2" style={{ minWidth: 980 }}>
-                            {dayLabels.map((label, index) => (
+                            {DAY_LABELS.map((label, index) => (
                                 <div key={label} className="flex flex-1 flex-col" style={{ minWidth: 140 }}>
                                     <TaskColumn
                                         dayIndex={index}
                                         label={label}
-                                        dateLabel={weekDates[index]}
-                                        isToday={index === todayDayIndex}
+                                        dateLabel={dateLabels[index]}
+                                        isToday={weekOffset === 0 && index === todayDayIndex}
                                         tasks={grouped[index] ?? []}
                                         onToggle={toggleTask}
                                         onEdit={startEdit}
                                         onDelete={deleteTask}
                                     />
-                                    {/* Inline add */}
                                     <div className="px-1 pb-2">
                                         <InlineAdd dayIndex={index} onAdd={handleInlineAdd} />
                                     </div>
@@ -359,6 +292,7 @@ export default function Tarefas({ tasks: initialTasks, members, weekLabel }: Tar
                             <TaskCard
                                 id={activeTask.id}
                                 title={activeTask.title}
+                                description={activeTask.description}
                                 completed={activeTask.completed}
                                 color={activeTask.color}
                                 assignees={activeTask.assignees}
@@ -370,94 +304,27 @@ export default function Tarefas({ tasks: initialTasks, members, weekLabel }: Tar
             </div>
 
             {/* ── Sheet: Editar Tarefa ──────────────────────────────────────── */}
-            <Sheet open={!!editingTask} onOpenChange={(o) => !o && setEditingTask(null)}>
-                <SheetContent side="right" className="w-full sm:max-w-sm">
-                    <SheetHeader>
-                        <SheetTitle>Editar tarefa</SheetTitle>
-                    </SheetHeader>
-                    <form onSubmit={submitEdit} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-2">
-                        <div className="grid gap-2">
-                            <Label>Título</Label>
-                            <Input
-                                autoFocus
-                                value={editForm.data.title}
-                                onChange={(e) => editForm.setData('title', e.target.value)}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Dia</Label>
-                            <select
-                                className="h-9 rounded-md border border-[#E4E3E0] bg-white px-3 text-sm text-[#1A1917]"
-                                value={editForm.data.day_of_week}
-                                onChange={(e) => editForm.setData('day_of_week', Number(e.target.value))}
-                            >
-                                {dayLabels.map((label, i) => (
-                                    <option key={label} value={i}>{label}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Cor</Label>
-                            <div className="flex items-center gap-2">
-                                {colorPresets.map((c) => (
-                                    <button
-                                        key={c}
-                                        type="button"
-                                        onClick={() => editForm.setData('color', c)}
-                                        className="size-6 rounded-full border-2 transition-transform hover:scale-110"
-                                        style={{
-                                            backgroundColor: c,
-                                            borderColor: editForm.data.color === c ? c : 'transparent',
-                                            outline: editForm.data.color === c ? `2px solid ${c}` : 'none',
-                                            outlineOffset: '2px',
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Descrição (opcional)</Label>
-                            <Textarea
-                                value={editForm.data.description}
-                                onChange={(e) => editForm.setData('description', e.target.value)}
-                                placeholder="Detalhes da tarefa..."
-                                rows={3}
-                            />
-                        </div>
-                        {members.length > 0 && (
-                            <div className="grid gap-2">
-                                <Label>Responsáveis</Label>
-                                <AssigneeSelect
-                                    members={members}
-                                    selected={editAssignees}
-                                    onChange={setEditAssignees}
-                                />
-                            </div>
-                        )}
+            <TaskEditSheet
+                task={editingTask}
+                members={members}
+                data={editForm.data}
+                errors={editForm.errors}
+                processing={editForm.processing}
+                assigneeIds={editAssignees}
+                setData={(k, v) => editForm.setData(k as any, v as any)}
+                onAssigneesChange={setEditAssignees}
+                onClose={() => setEditingTask(null)}
+                onSubmit={submitEdit}
+                onDelete={deleteTask}
+            />
 
-                        {editingTask && (
-                            <div className="mt-2 border-t border-[#F0EFED] pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => { deleteTask(editingTask.id); setEditingTask(null); }}
-                                    className="text-sm text-[#DC2626] hover:underline"
-                                >
-                                    Remover tarefa
-                                </button>
-                            </div>
-                        )}
-
-                        <SheetFooter>
-                            <Button
-                                type="submit"
-                                disabled={!editForm.data.title.trim() || editForm.processing}
-                            >
-                                Salvar alterações
-                            </Button>
-                        </SheetFooter>
-                    </form>
-                </SheetContent>
-            </Sheet>
+            {/* ── Confirm: Remover Tarefa ───────────────────────────────────── */}
+            <ConfirmDialog
+                open={!!pendingDelete}
+                description={`Tem certeza que deseja remover "${pendingDelete?.label}"?`}
+                onConfirm={() => { pendingDelete?.action(); setPendingDelete(null); }}
+                onCancel={() => setPendingDelete(null)}
+            />
         </AppLayout>
     );
 }

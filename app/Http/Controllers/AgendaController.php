@@ -53,7 +53,7 @@ class AgendaController extends Controller
             'time' => $request->validated()['time'],
         ]);
 
-        return redirect()->route('agenda')->with('success', 'Compromisso criado.');
+        return redirect()->route('agenda.index')->with('success', 'Compromisso criado.');
     }
 
     public function update(UpdateAgendaEventRequest $request, AgendaEvent $event): RedirectResponse
@@ -63,7 +63,7 @@ class AgendaController extends Controller
         $event->fill(array_filter($request->validated(), fn ($value) => $value !== null));
         $event->save();
 
-        return redirect()->route('agenda')->with('success', 'Compromisso atualizado.');
+        return redirect()->route('agenda.index')->with('success', 'Compromisso atualizado.');
     }
 
     public function destroy(Request $request, AgendaEvent $event): RedirectResponse
@@ -71,7 +71,7 @@ class AgendaController extends Controller
         $this->ensureCanEdit($request, $event);
         $event->delete();
 
-        return redirect()->route('agenda')->with('success', 'Compromisso removido.');
+        return redirect()->route('agenda.index')->with('success', 'Compromisso removido.');
     }
 
     private function ensureCanEdit(Request $request, AgendaEvent $event): void

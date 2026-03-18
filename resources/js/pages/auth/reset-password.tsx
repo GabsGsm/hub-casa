@@ -10,7 +10,7 @@ import { update } from '@/routes/password';
 
 export default function ResetPassword({ token, email }: { token: string; email: string }) {
     return (
-        <AuthLayout title="Redefinir senha" description="Digite sua nova senha abaixo">
+        <AuthLayout description="Crie uma nova senha para sua conta">
             <Head title="Redefinir senha" />
             <Form
                 {...update.form()}

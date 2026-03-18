@@ -1,11 +1,12 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AvatarStack } from '@/components/hub/avatar-stack';
 
 type TaskCardProps = {
     id: number;
     title: string;
+    description?: string | null;
     completed: boolean;
     color?: string | null;
     assignees: { id: number; name: string }[];
@@ -18,6 +19,7 @@ type TaskCardProps = {
 export function TaskCard({
     id,
     title,
+    description,
     completed,
     color,
     assignees,
@@ -65,7 +67,7 @@ export function TaskCard({
             {...listeners}
         >
             {/* Title row */}
-            <div className="mb-2 flex items-start justify-between gap-1">
+            <div className="mb-1.5 flex items-start justify-between gap-1">
                 <span
                     className={cn(
                         'flex-1 text-sm leading-snug',
@@ -76,7 +78,20 @@ export function TaskCard({
                 >
                     {title}
                 </span>
+                {description && (
+                    <ChevronRight size={12} className="mt-0.5 shrink-0 text-[#9B9A96]" />
+                )}
             </div>
+
+            {/* Description preview */}
+            {description && (
+                <p className={cn(
+                    'mb-2 line-clamp-2 text-xs leading-snug',
+                    completed ? 'text-[#9B9A96] opacity-40' : 'text-[#9B9A96]',
+                )}>
+                    {description}
+                </p>
+            )}
 
             {/* Bottom row: avatars + circular checkbox */}
             <div className="flex items-center justify-between">

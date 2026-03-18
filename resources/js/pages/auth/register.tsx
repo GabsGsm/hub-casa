@@ -8,14 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
 import { login } from '@/routes';
-import { store } from '@/routes/register';
+//import { store } from '@/routes/register';
 
 export default function Register() {
     return (
-        <AuthLayout title="Criar conta" description="Preencha os dados abaixo para começar">
+        <AuthLayout description="Crie sua conta para começar">
             <Head title="Criar conta" />
             <Form
-                {...store.form()}
+                //{...store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
                 className="flex flex-col gap-5"

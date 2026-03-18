@@ -5,6 +5,7 @@ import { TaskCard } from '@/components/hub/task-card';
 type Task = {
     id: number;
     title: string;
+    description?: string | null;
     completed: boolean;
     color?: string | null;
     assignees: { id: number; name: string }[];
@@ -80,6 +81,7 @@ export function TaskColumn({
                                 key={task.id}
                                 id={task.id}
                                 title={task.title}
+                                description={task.description}
                                 completed={task.completed}
                                 color={task.color}
                                 assignees={task.assignees}

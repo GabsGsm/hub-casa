@@ -1,10 +1,10 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal, Plus, Trash2, X } from 'lucide-react';
+import { MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import InputError from '@/components/input-error';
+import { ConfirmDialog } from '@/components/hub/confirm-dialog';
 import { CyclePill } from '@/components/hub/cycle-pill';
-import { ProgressBar } from '@/components/hub/progress-bar';
 import { StatusPill } from '@/components/hub/status-pill';
-import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -18,641 +18,34 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Sheet,
-    SheetContent,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
 import AppLayout from '@/layouts/app-layout';
+import { CycleCard } from './components/cycle-card';
+import { HistoricoView } from './components/historico-view';
+import { TxDrawer } from './components/tx-drawer';
+import { TxFormFields } from './components/tx-form-fields';
+import type { Cycle, FinanceiroProps, MainTab, Transaction, TxFilter } from './types';
+import { currency, TX_FILTERS, resolveTransactionsForMonth } from './utils';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-type Cycle = {
-    id: number;
-    name: string;
-    day_of_month: number | null;
-    expected_amount: number;
-    paid: number;
-    pending: number;
-};
-
-type Transaction = {
-    id: number;
-    title: string;
-    amount: number;
-    type: string;       // 'gasto' | 'ganho' | 'divida'
-    status: string;     // 'aberto' | 'pago' | 'impossibilitado'
-    created_at: string; // YYYY-MM-DD
-    due_date: string | null;
-    recurrence: string | null;   // 'mensal' | null
-    installments_count: number | null;
-    cycle: { id: number; name: string; day_of_month: number | null } | null;
-    category: { id: number; name: string; color: string | null } | null;
-    assignees: { id: number; name: string }[];
-};
-
-// Transação "resolvida" para um mês específico
-type ResolvedTransaction = Transaction & {
-    resolvedDate: string;        // due_date projetado para o mês alvo
-    installmentNum?: number;     // parcela atual (1-based)
-    installmentsTotal?: number;
-};
-
-type MonthProjection = {
-    year: number;
-    month: number;
-    label: string;
-    phase: 'past' | 'current' | 'future';
-    transactions: ResolvedTransaction[];
-    totalExpected: number;
-    totalPaid: number;
-    totalPending: number;
-};
-
-type FinanceiroProps = {
-    house: { id: number; name: string };
-    cycles: Cycle[];
-    transactions: Transaction[];
-    categories: { id: number; name: string; color: string | null }[];
-    members: { id: number; name: string }[];
-};
-
-type MainTab = 'visao-geral' | 'historico';
-type TxFilter = 'todos' | 'pago' | 'pendente' | 'recorrente' | 'divida';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-
-const TX_FILTERS: { key: TxFilter; label: string }[] = [
-    { key: 'todos', label: 'Todos' },
-    { key: 'pendente', label: 'Pendente' },
-    { key: 'pago', label: 'Pago' },
-    { key: 'recorrente', label: 'Recorrente' },
-    { key: 'divida', label: 'Dívidas' },
-];
-
-const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function noneOrVal(v: string) { return v === '__none__' ? '' : v; }
-function valOrNone(v: string | number | null | undefined) { return v ? String(v) : '__none__'; }
-
-/** Constrói uma data YYYY-MM-DD para o mês/ano alvo, usando o mesmo dia da data de origem. */
-function dateForMonth(origDay: number, year: number, month: number): string {
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const day = Math.min(origDay, daysInMonth);
-    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
-
-/**
- * Resolve quais transações aparecem em um dado mês.
- *
- * Regras:
- * - Gasto/Ganho simples: aparece apenas no mês de (due_date ?? created_at)
- * - Gasto/Ganho mensal: aparece em todo mês, com due_date projetado ao mesmo dia
- * - Dívida parcelada: aparece nos meses [0, installments_count) a partir do due_date
- */
-function resolveTransactionsForMonth(
-    transactions: Transaction[],
-    year: number,
-    month: number, // 0-indexed
-): ResolvedTransaction[] {
-    const result: ResolvedTransaction[] = [];
-
-    for (const t of transactions) {
-        // Data de origem: due_date ou created_at como fallback
-        const effectiveDateStr = t.due_date ?? t.created_at;
-        const origDate = new Date(effectiveDateStr + 'T00:00');
-        const oy = origDate.getFullYear();
-        const om = origDate.getMonth();
-        const origDay = origDate.getDate();
-
-        if (t.recurrence === 'mensal') {
-            // Aparece em todo mês — projeta a data para o mês alvo
-            result.push({
-                ...t,
-                resolvedDate: dateForMonth(origDay, year, month),
-            });
-        } else if (t.type === 'divida' && t.installments_count) {
-            // Parcela N cai neste mês?
-            const installNum = (year - oy) * 12 + (month - om); // 0-based
-            if (installNum >= 0 && installNum < t.installments_count) {
-                result.push({
-                    ...t,
-                    resolvedDate: dateForMonth(origDay, year, month),
-                    installmentNum: installNum + 1,
-                    installmentsTotal: t.installments_count,
-                });
-            }
-        } else {
-            // Gasto/Ganho simples: só aparece no mês da data efetiva
-            if (oy === year && om === month) {
-                result.push({ ...t, resolvedDate: effectiveDateStr });
-            }
-        }
-    }
-
-    return result;
-}
-
-// ---------------------------------------------------------------------------
-// MonthCard (Histórico)
-// ---------------------------------------------------------------------------
-function MonthCard({ data, defaultExpanded }: { data: MonthProjection; defaultExpanded: boolean }) {
-    const [expanded, setExpanded] = useState(defaultExpanded);
-
-    const phaseColor =
-        data.phase === 'past' ? '#9B9A96' : data.phase === 'current' ? '#2563EB' : '#D97706';
-    const phaseLabel =
-        data.phase === 'past' ? 'Passado' : data.phase === 'current' ? 'Atual' : 'Projetado';
-
-    const expenses = data.transactions.filter((t) => t.type !== 'ganho');
-    const incomes  = data.transactions.filter((t) => t.type === 'ganho');
-
-    return (
-        <div
-            className={`overflow-hidden rounded-[12px] border bg-white ${
-                data.phase === 'current' ? 'border-[#2563EB]' : 'border-[#E4E3E0]'
-            }`}
-        >
-            {/* Header */}
-            <div
-                className="flex cursor-pointer items-center justify-between px-5 py-4"
-                onClick={() => setExpanded((v) => !v)}
-            >
-                <div>
-                    <div className="flex items-center gap-2">
-                        <span className="font-medium text-[#1A1917]">{data.label}</span>
-                        <span
-                            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                            style={{ background: `${phaseColor}22`, color: phaseColor }}
-                        >
-                            {phaseLabel}
-                        </span>
-                    </div>
-                    <div className="mt-0.5 font-mono text-xs text-[#9B9A96]">
-                        {data.transactions.length} lançamento{data.transactions.length !== 1 ? 's' : ''}
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    {data.phase !== 'future' && (
-                        <div className="hidden text-right sm:block">
-                            <div className="font-mono text-xs text-[#059669]">
-                                {currency.format(data.totalPaid)} pago
-                            </div>
-                            <div className="font-mono text-xs text-[#D97706]">
-                                {currency.format(data.totalPending)} pendente
-                            </div>
-                        </div>
-                    )}
-                    <div className="text-right">
-                        <div className="font-mono text-sm font-semibold" style={{ color: phaseColor }}>
-                            {currency.format(data.totalExpected)}
-                        </div>
-                        <div className="font-mono text-[10px] text-[#9B9A96]">
-                            {data.phase === 'future' ? 'projetado' : 'total gastos'}
-                        </div>
-                    </div>
-                    <ChevronDown
-                        size={14}
-                        className={`shrink-0 text-[#9B9A96] transition-transform ${expanded ? 'rotate-180' : ''}`}
-                    />
-                </div>
-            </div>
-
-            {/* Progress bar */}
-            {data.phase !== 'future' && data.totalExpected > 0 && (
-                <div className="px-5 pb-2">
-                    <ProgressBar value={data.totalPaid} max={data.totalExpected} height={4} />
-                </div>
-            )}
-
-            {/* Body */}
-            {expanded && (
-                <div className="border-t border-[#F0EFED]">
-                    {data.transactions.length === 0 ? (
-                        <div className="px-5 py-4 text-sm text-[#9B9A96]">
-                            Nenhum lançamento para este mês.
-                        </div>
-                    ) : (
-                        <div>
-                            {/* Gastos */}
-                            {expenses.map((t) => (
-                                <div
-                                    key={`${t.id}-${t.installmentNum ?? 0}`}
-                                    className="flex items-center gap-3 border-b border-[#F0EFED] px-5 py-2.5 last:border-0"
-                                >
-                                    <div
-                                        className="size-1.5 shrink-0 rounded-full"
-                                        style={{
-                                            background:
-                                                data.phase === 'future'
-                                                    ? '#D97706'
-                                                    : t.status === 'pago'
-                                                      ? '#059669'
-                                                      : '#D97706',
-                                        }}
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                        <span
-                                            className={`text-sm ${
-                                                data.phase !== 'future' && t.status === 'pago'
-                                                    ? 'text-[#9B9A96]'
-                                                    : 'text-[#1A1917]'
-                                            }`}
-                                        >
-                                            {t.title}
-                                        </span>
-                                        {/* Badges */}
-                                        {t.category && (
-                                            <span className="ml-1.5 rounded-full bg-[#F0EFED] px-1.5 py-0.5 text-[10px] text-[#6B6A67]">
-                                                {t.category.name}
-                                            </span>
-                                        )}
-                                        {t.recurrence && (
-                                            <span className="ml-1.5 rounded-full bg-[#EFF6FF] px-1.5 py-0.5 text-[10px] text-[#2563EB]">
-                                                mensal · dia {new Date(t.resolvedDate + 'T00:00').getDate()}
-                                            </span>
-                                        )}
-                                        {t.installmentNum && (
-                                            <span className="ml-1.5 rounded-full bg-[#F0EFED] px-1.5 py-0.5 text-[10px] text-[#6B6A67]">
-                                                {t.installmentNum}/{t.installmentsTotal}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="shrink-0 font-mono text-xs text-[#9B9A96]">
-                                        {t.resolvedDate}
-                                    </span>
-                                    <span className="shrink-0 font-mono text-sm text-[#3D3C3A]">
-                                        {currency.format(t.amount)}
-                                    </span>
-                                    {data.phase !== 'future' && <StatusPill status={t.status} />}
-                                    {data.phase === 'future' && (
-                                        <span className="shrink-0 rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-medium text-[#D97706]">
-                                            projetado
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
-
-                            {/* Receitas */}
-                            {incomes.length > 0 && (
-                                <>
-                                    <div className="border-t border-b border-[#F0EFED] bg-[#F0FDF4] px-5 py-1.5">
-                                        <span className="text-[10px] font-medium uppercase tracking-wide text-[#15803D]">
-                                            Receitas · {incomes.length}
-                                        </span>
-                                    </div>
-                                    {incomes.map((t) => (
-                                        <div
-                                            key={t.id}
-                                            className="flex items-center gap-3 border-b border-[#F0EFED] px-5 py-2.5 last:border-0"
-                                        >
-                                            <div className="size-1.5 shrink-0 rounded-full bg-[#059669]" />
-                                            <span className="min-w-0 flex-1 text-sm text-[#1A1917]">
-                                                {t.title}
-                                            </span>
-                                            {t.recurrence && (
-                                                <span className="rounded-full bg-[#EFF6FF] px-1.5 py-0.5 text-[10px] text-[#2563EB]">
-                                                    mensal · dia {new Date(t.resolvedDate + 'T00:00').getDate()}
-                                                </span>
-                                            )}
-                                            <span className="shrink-0 font-mono text-sm text-[#059669]">
-                                                +{currency.format(t.amount)}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// AssigneeSelect
-// ---------------------------------------------------------------------------
-function AssigneeSelect({
-    members,
-    selected,
-    onChange,
-}: {
-    members: { id: number; name: string }[];
-    selected: number[];
-    onChange: (ids: number[]) => void;
-}) {
-    function toggle(id: number) {
-        if (selected.includes(id)) onChange(selected.filter((s) => s !== id));
-        else onChange([...selected, id]);
-    }
-    return (
-        <div className="flex flex-wrap gap-2">
-            {members.map((m) => {
-                const active = selected.includes(m.id);
-                const initials = m.name
-                    .split(' ')
-                    .map((w) => w[0])
-                    .join('')
-                    .slice(0, 2)
-                    .toUpperCase();
-                return (
-                    <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => toggle(m.id)}
-                        title={m.name}
-                        className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium transition-colors ${
-                            active
-                                ? 'border-[#2563EB] bg-[#EFF6FF] text-[#2563EB]'
-                                : 'border-[#E4E3E0] bg-white text-[#6B6A67] hover:border-[#C8C7C3]'
-                        }`}
-                    >
-                        <span
-                            className="flex size-4 items-center justify-center rounded-full text-white"
-                            style={{ fontSize: 8, background: active ? '#2563EB' : '#9B9A96' }}
-                        >
-                            {initials}
-                        </span>
-                        {m.name.split(' ')[0]}
-                        {active && <X size={10} />}
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// TxFormFields
-// ---------------------------------------------------------------------------
-function TxFormFields({
-    data,
-    setData,
-    cycles,
-    categories,
-    members,
-    assigneeIds,
-    onAssigneesChange,
-}: {
-    data: Record<string, string>;
-    setData: (key: string, value: string) => void;
-    cycles: Cycle[];
-    categories: { id: number; name: string; color: string | null }[];
-    members: { id: number; name: string }[];
-    assigneeIds: number[];
-    onAssigneesChange: (ids: number[]) => void;
-}) {
-    const isDivida = data.type === 'divida';
-
-    const dueDayOfMonth = data.due_date
-        ? new Date(data.due_date + 'T00:00').getDate()
-        : null;
-
-    function handleTypeChange(v: string) {
-        setData('type', v);
-        if (v === 'divida') setData('recurrence', '');
-        else setData('installments_count', '');
-    }
-
-    return (
-        <>
-            <div className="grid gap-2">
-                <Label>Título</Label>
-                <Input value={data.title} onChange={(e) => setData('title', e.target.value)} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-2">
-                    <Label>Valor (R$)</Label>
-                    <Input
-                        type="number"
-                        value={data.amount}
-                        onChange={(e) => setData('amount', e.target.value)}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label>
-                        Vencimento{isDivida && <span className="ml-0.5 text-[#DC2626]">*</span>}
-                    </Label>
-                    <Input
-                        type="date"
-                        value={data.due_date}
-                        onChange={(e) => setData('due_date', e.target.value)}
-                        required={isDivida}
-                    />
-                    {!isDivida && !data.due_date && (
-                        <p className="text-xs text-[#9B9A96]">Sem data → usa a data de criação</p>
-                    )}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-2">
-                    <Label>Tipo</Label>
-                    <Select value={data.type} onValueChange={handleTypeChange}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="gasto">Gasto</SelectItem>
-                            <SelectItem value="ganho">Ganho</SelectItem>
-                            <SelectItem value="divida">Dívida / Parcelado</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="grid gap-2">
-                    <Label>Status</Label>
-                    <Select value={data.status} onValueChange={(v) => setData('status', v)}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="aberto">Aberto</SelectItem>
-                            <SelectItem value="pago">Pago</SelectItem>
-                            <SelectItem value="impossibilitado">Impossibilitado</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-
-            {isDivida ? (
-                <div className="grid gap-2">
-                    <Label>
-                        Nº de parcelas<span className="ml-0.5 text-[#DC2626]">*</span>
-                    </Label>
-                    <Input
-                        type="number"
-                        min={1}
-                        value={data.installments_count}
-                        onChange={(e) => setData('installments_count', e.target.value)}
-                        required
-                        placeholder="Ex: 12"
-                    />
-                    <p className="text-xs text-[#9B9A96]">
-                        Parcelas seguintes são projetadas automaticamente no Histórico
-                    </p>
-                </div>
-            ) : (
-                <div className="grid gap-2">
-                    <Label>Recorrência</Label>
-                    <Select
-                        value={valOrNone(data.recurrence)}
-                        onValueChange={(v) => setData('recurrence', noneOrVal(v))}
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__none__">Não recorrente</SelectItem>
-                            <SelectItem value="mensal">Mensal</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    {data.recurrence === 'mensal' && dueDayOfMonth && (
-                        <p className="text-xs text-[#2563EB]">
-                            Projetado todo dia {dueDayOfMonth} de cada mês
-                        </p>
-                    )}
-                    {data.recurrence === 'mensal' && !data.due_date && (
-                        <p className="text-xs text-[#9B9A96]">
-                            Defina o vencimento para fixar o dia da recorrência
-                        </p>
-                    )}
-                </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-2">
-                    <Label>Ciclo</Label>
-                    <Select
-                        value={valOrNone(data.payment_cycle_id)}
-                        onValueChange={(v) => setData('payment_cycle_id', noneOrVal(v))}
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__none__">Sem ciclo</SelectItem>
-                            {cycles.map((c) => (
-                                <SelectItem key={c.id} value={String(c.id)}>
-                                    {c.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="grid gap-2">
-                    <Label>Categoria</Label>
-                    <Select
-                        value={valOrNone(data.category_id)}
-                        onValueChange={(v) => setData('category_id', noneOrVal(v))}
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__none__">Sem categoria</SelectItem>
-                            {categories.map((c) => (
-                                <SelectItem key={c.id} value={String(c.id)}>
-                                    {c.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-
-            {members.length > 0 && (
-                <div className="grid gap-2">
-                    <Label>Responsáveis</Label>
-                    <AssigneeSelect
-                        members={members}
-                        selected={assigneeIds}
-                        onChange={onAssigneesChange}
-                    />
-                </div>
-            )}
-        </>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 export default function Financeiro({ cycles, transactions, categories, members }: FinanceiroProps) {
     const [mainTab, setMainTab] = useState<MainTab>('visao-geral');
     const [txFilter, setTxFilter] = useState<TxFilter>('todos');
-    const [histStart, setHistStart] = useState(-2);
 
     // ── Data: mês atual ───────────────────────────────────────────────────────
     const today = new Date();
     const currentYear  = today.getFullYear();
-    const currentMonth = today.getMonth(); // 0-indexed
+    const currentMonth = today.getMonth();
 
-    /** Lançamentos resolvidos para o mês atual */
     const currentMonthTx = useMemo(
         () => resolveTransactionsForMonth(transactions, currentYear, currentMonth),
         [transactions],
     );
 
-    // ── Ciclo: criar/editar ───────────────────────────────────────────────────
-    const [cycleDialogOpen, setCycleDialogOpen] = useState(false);
-    const cycleForm = useForm({ name: '', day_of_month: '', expected_amount: '' });
-    const [editingCycle, setEditingCycle] = useState<Cycle | null>(null);
-    const editCycleForm = useForm({ name: '', day_of_month: '', expected_amount: '' });
-
-    // ── Lançamento: criar/editar ──────────────────────────────────────────────
-    const [txSheetOpen, setTxSheetOpen] = useState(false);
-    const [createAssignees, setCreateAssignees] = useState<number[]>([]);
-    const txForm = useForm({
-        title: '', amount: '', type: 'gasto', status: 'aberto',
-        due_date: '', payment_cycle_id: '', category_id: '',
-        recurrence: '', installments_count: '',
-    });
-
-    const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-    const [editAssignees, setEditAssignees] = useState<number[]>([]);
-    const editTxForm = useForm({
-        title: '', amount: '', type: 'gasto', status: 'aberto',
-        due_date: '', payment_cycle_id: '', category_id: '',
-        recurrence: '', installments_count: '',
-    });
-
     // ── Computed: Visão Geral ─────────────────────────────────────────────────
 
-    /** Totais do mês atual */
-    const totals = useMemo(
-        () =>
-            currentMonthTx.reduce(
-                (acc, t) => {
-                    t.type !== 'ganho' ? (acc.expenses += t.amount) : (acc.income += t.amount);
-                    return acc;
-                },
-                { expenses: 0, income: 0 },
-            ),
-        [currentMonthTx],
-    );
-
-    /** Paid/pending por ciclo — calculados do mês atual. Key 0 = sem ciclo */
+    /** Paid/pending por ciclo — key 0 = sem ciclo */
     const cycleMthTotals = useMemo(() => {
         const map: Record<number, { paid: number; pending: number }> = {};
         currentMonthTx.forEach((t) => {
@@ -665,43 +58,44 @@ export default function Financeiro({ cycles, transactions, categories, members }
         return map;
     }, [currentMonthTx]);
 
-    /** Lançamentos filtrados do mês atual */
     const filteredTx = useMemo(() => {
         switch (txFilter) {
-            case 'pago':
-                return currentMonthTx.filter((t) => t.status === 'pago');
-            case 'pendente':
-                return currentMonthTx.filter((t) => t.status !== 'pago');
-            case 'recorrente':
-                return currentMonthTx.filter((t) => !!t.recurrence);
-            case 'divida':
-                return currentMonthTx.filter((t) => t.type === 'divida');
-            default:
-                return currentMonthTx;
+            case 'pago':       return currentMonthTx.filter((t) => t.status === 'pago');
+            case 'pendente':   return currentMonthTx.filter((t) => t.status !== 'pago');
+            case 'recorrente': return currentMonthTx.filter((t) => !!t.recurrence);
+            case 'divida':     return currentMonthTx.filter((t) => t.type === 'divida');
+            default:           return currentMonthTx;
         }
     }, [currentMonthTx, txFilter]);
 
-    // ── Computed: Histórico ───────────────────────────────────────────────────
-    const monthProjections = useMemo<MonthProjection[]>(() => {
-        return Array.from({ length: 6 }, (_, idx) => {
-            const offset = histStart + idx;
-            const d = new Date(currentYear, currentMonth + offset, 1);
-            const year  = d.getFullYear();
-            const month = d.getMonth();
-            const phase: 'past' | 'current' | 'future' =
-                offset < 0 ? 'past' : offset === 0 ? 'current' : 'future';
-            const label = `${MONTH_NAMES[month]} ${year}`;
+    const tableTotal = filteredTx.reduce(
+        (s, t) => (t.type === 'ganho' ? s + t.amount : s - t.amount),
+        0,
+    );
 
-            const resolved = resolveTransactionsForMonth(transactions, year, month);
+    // ── Ciclos: criar/editar ──────────────────────────────────────────────────
+    const [cycleDialogOpen, setCycleDialogOpen] = useState(false);
+    const cycleForm = useForm({ name: '', day_of_month: '', expected_amount: '' });
+    const [editingCycle, setEditingCycle] = useState<Cycle | null>(null);
+    const editCycleForm = useForm({ name: '', day_of_month: '', expected_amount: '' });
 
-            const expenses = resolved.filter((t) => t.type !== 'ganho');
-            const totalExpected = expenses.reduce((s, t) => s + t.amount, 0);
-            const totalPaid     = expenses.filter((t) => t.status === 'pago').reduce((s, t) => s + t.amount, 0);
-            const totalPending  = expenses.filter((t) => t.status !== 'pago').reduce((s, t) => s + t.amount, 0);
+    // ── Lançamentos: criar/editar ─────────────────────────────────────────────
+    const [txDrawerOpen, setTxDrawerOpen] = useState(false);
+    const [createAssignees, setCreateAssignees] = useState<number[]>([]);
+    const txForm = useForm({
+        title: '', amount: '', type: 'gasto', status: 'aberto',
+        due_date: '', payment_cycle_id: '', category_id: '',
+        recurrence: '', installments_count: '',
+    });
 
-            return { year, month, label, phase, transactions: resolved, totalExpected, totalPaid, totalPending };
-        });
-    }, [transactions, histStart]);
+    const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+    const [editAssignees, setEditAssignees] = useState<number[]>([]);
+    const [pendingDelete, setPendingDelete] = useState<{ action: () => void; label: string } | null>(null);
+    const editTxForm = useForm({
+        title: '', amount: '', type: 'gasto', status: 'aberto',
+        due_date: '', payment_cycle_id: '', category_id: '',
+        recurrence: '', installments_count: '',
+    });
 
     // ── Handlers: ciclos ──────────────────────────────────────────────────────
     function openEditCycle(cycle: Cycle) {
@@ -728,15 +122,17 @@ export default function Financeiro({ cycles, transactions, categories, members }
         });
     }
     function deleteCycle(cycle: Cycle) {
-        if (!confirm(`Remover ciclo "${cycle.name}"?`)) return;
-        router.delete(`/financeiro/ciclos/${cycle.id}`, { preserveScroll: true });
+        setPendingDelete({
+            action: () => router.delete(`/financeiro/ciclos/${cycle.id}`, { preserveScroll: true }),
+            label: cycle.name,
+        });
     }
 
     // ── Handlers: transações ──────────────────────────────────────────────────
     function openCreateTx() {
         setCreateAssignees([]);
         txForm.reset();
-        setTxSheetOpen(true);
+        setTxDrawerOpen(true);
     }
     function openEditTx(tx: Transaction) {
         setEditingTx(tx);
@@ -755,31 +151,34 @@ export default function Financeiro({ cycles, transactions, categories, members }
     }
     function submitCreateTx(e: React.FormEvent) {
         e.preventDefault();
-        router.post(
-            '/financeiro/lancamentos',
-            { ...txForm.data, assignee_ids: createAssignees },
-            { preserveScroll: true, onSuccess: () => { txForm.reset(); setTxSheetOpen(false); } },
-        );
+        txForm.transform((d) => ({ ...d, assignee_ids: createAssignees }));
+        txForm.post('/financeiro/lancamentos', {
+            preserveScroll: true,
+            onSuccess: () => { txForm.reset(); setTxDrawerOpen(false); },
+        });
     }
     function submitEditTx(e: React.FormEvent) {
         e.preventDefault();
         if (!editingTx) return;
-        router.put(
-            `/financeiro/lancamentos/${editingTx.id}`,
-            { ...editTxForm.data, assignee_ids: editAssignees },
-            { preserveScroll: true, onSuccess: () => setEditingTx(null) },
-        );
+        editTxForm.transform((d) => ({ ...d, assignee_ids: editAssignees }));
+        editTxForm.put(`/financeiro/lancamentos/${editingTx.id}`, {
+            preserveScroll: true,
+            onSuccess: () => setEditingTx(null),
+        });
     }
     function deleteTransaction(tx: Transaction) {
-        if (!confirm(`Remover lançamento "${tx.title}"?`)) return;
-        router.delete(`/financeiro/lancamentos/${tx.id}`, { preserveScroll: true });
+        setPendingDelete({
+            action: () => router.delete(`/financeiro/lancamentos/${tx.id}`, { preserveScroll: true }),
+            label: tx.title,
+        });
     }
     function markAsPaid(id: number) {
         router.put(`/financeiro/lancamentos/${id}`, { status: 'pago' }, { preserveScroll: true });
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
-    const monthLabel = `${MONTH_NAMES[currentMonth]} ${currentYear}`;
+    const noCycle = cycleMthTotals[0];
+    const showNoCycle = noCycle && (noCycle.paid > 0 || noCycle.pending > 0);
 
     return (
         <AppLayout
@@ -791,274 +190,233 @@ export default function Financeiro({ cycles, transactions, categories, members }
             <Head title="Financeiro" />
             <div className="flex flex-col gap-6 p-6">
 
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <div className="text-[28px] font-semibold leading-tight text-[#1A1917]">
-                            Financeiro
-                        </div>
-                        <div className="text-sm text-[#9B9A96]">
-                            Ciclos de pagamento e lançamentos.
-                        </div>
+                {/* ── Header ── */}
+                <div>
+                    <h1 className="text-[28px] font-semibold text-[#1A1917]">Financeiro</h1>
+                    <div className="mt-4 flex items-center gap-1 border-b border-[#E4E3E0]">
+                        {(['visao-geral', 'historico'] as MainTab[]).map((tab) => (
+                            <button
+                                key={tab}
+                                type="button"
+                                onClick={() => setMainTab(tab)}
+                                className={`relative pb-3 px-4 text-sm transition-colors ${
+                                    mainTab === tab
+                                        ? 'text-[#1A1917]'
+                                        : 'text-[#9B9A96] hover:text-[#6B6A67]'
+                                }`}
+                            >
+                                {tab === 'visao-geral' ? 'Visão Geral' : 'Histórico'}
+                                {mainTab === tab && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-[#1A1917]" />
+                                )}
+                            </button>
+                        ))}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="secondary" onClick={() => setCycleDialogOpen(true)} className="gap-2">
-                            <Plus className="size-4" /> Novo ciclo
-                        </Button>
-                        <Button onClick={openCreateTx} className="gap-2">
-                            <Plus className="size-4" /> Novo lançamento
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Tab switcher */}
-                <div className="flex w-fit items-center gap-1 rounded-[10px] border border-[#E4E3E0] bg-[#F8F8F7] p-1">
-                    {(['visao-geral', 'historico'] as MainTab[]).map((tab) => (
-                        <button
-                            key={tab}
-                            type="button"
-                            onClick={() => setMainTab(tab)}
-                            className={`rounded-[7px] px-4 py-1.5 text-sm font-medium transition-colors ${
-                                mainTab === tab
-                                    ? 'bg-white text-[#1A1917] shadow-sm'
-                                    : 'text-[#6B6A67] hover:text-[#1A1917]'
-                            }`}
-                        >
-                            {tab === 'visao-geral' ? 'Visão Geral' : 'Histórico'}
-                        </button>
-                    ))}
                 </div>
 
                 {/* ════════ TAB: VISÃO GERAL ════════ */}
                 {mainTab === 'visao-geral' && (
                     <>
-                        {/* Mês atual label + filter chips */}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <span className="font-mono text-xs text-[#9B9A96]">
-                                Exibindo lançamentos de <strong className="text-[#1A1917]">{monthLabel}</strong>
-                            </span>
-                            <div className="flex flex-wrap items-center gap-2">
-                                {TX_FILTERS.map(({ key, label }) => {
-                                    const count =
-                                        key === 'todos'      ? currentMonthTx.length
-                                        : key === 'pago'     ? currentMonthTx.filter((t) => t.status === 'pago').length
-                                        : key === 'pendente' ? currentMonthTx.filter((t) => t.status !== 'pago').length
-                                        : key === 'recorrente' ? currentMonthTx.filter((t) => !!t.recurrence).length
-                                        : currentMonthTx.filter((t) => t.type === 'divida').length;
+                        {/* Cycle cards */}
+                        <div>
+                            <div className="mb-4 flex items-center justify-between">
+                                <h3 className="text-[16px] font-medium text-[#1A1917]">Ciclos de Pagamento</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setCycleDialogOpen(true)}
+                                    className="flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
+                                >
+                                    <Plus size={14} />
+                                    Novo ciclo
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                {cycles.map((cycle) => {
+                                    const mth = cycleMthTotals[cycle.id] ?? { paid: 0, pending: 0 };
                                     return (
+                                        <div key={cycle.id} className="group relative">
+                                            <CycleCard
+                                                name={cycle.name}
+                                                dayOfMonth={cycle.day_of_month}
+                                                expectedAmount={cycle.expected_amount}
+                                                paid={mth.paid}
+                                                pending={mth.pending}
+                                            />
+                                            <div className="absolute right-3 top-3 opacity-0 transition-opacity group-hover:opacity-100">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <button className="flex size-6 items-center justify-center rounded-[4px] transition-colors hover:bg-[#F0EFED]">
+                                                            <MoreHorizontal size={13} className="text-[#6B6A67]" />
+                                                        </button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => openEditCycle(cycle)}>
+                                                            Editar ciclo
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() => deleteCycle(cycle)}
+                                                            className="text-[#DC2626] focus:text-[#DC2626]"
+                                                        >
+                                                            Remover ciclo
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {showNoCycle && (
+                                    <CycleCard
+                                        name="Sem ciclo"
+                                        dayOfMonth={null}
+                                        expectedAmount={0}
+                                        paid={noCycle.paid}
+                                        pending={noCycle.pending}
+                                        isNoCycle
+                                    />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Lançamentos section */}
+                        <div>
+                            {/* Section header: title + filters + new button */}
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                                <h3 className="text-[16px] font-medium text-[#1A1917]">Lançamentos do ciclo</h3>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {TX_FILTERS.map(({ key, label }) => (
                                         <button
                                             key={key}
                                             type="button"
                                             onClick={() => setTxFilter(key)}
-                                            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                                            className={`rounded-full border px-3 py-1 text-sm transition-colors ${
                                                 txFilter === key
-                                                    ? 'bg-[#1A1917] text-white'
-                                                    : 'bg-[#F0EFED] text-[#6B6A67] hover:bg-[#E4E3E0]'
+                                                    ? 'border-[#1A1917] bg-[#1A1917] text-white'
+                                                    : 'border-[#C8C7C3] bg-white text-[#6B6A67] hover:border-[#9B9A96]'
                                             }`}
                                         >
                                             {label}
-                                            <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${txFilter === key ? 'bg-white/20' : 'bg-white text-[#9B9A96]'}`}>
-                                                {count}
-                                            </span>
                                         </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Transactions table */}
-                        <div className="overflow-hidden rounded-[12px] border border-[#E4E3E0] bg-white">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="border-b border-[#E4E3E0] text-xs uppercase text-[#9B9A96]">
-                                        <tr>
-                                            <th className="px-4 py-3">Descrição</th>
-                                            <th className="px-4 py-3">Valor</th>
-                                            <th className="px-4 py-3">Vencimento</th>
-                                            <th className="px-4 py-3">Ciclo</th>
-                                            <th className="px-4 py-3">Status</th>
-                                            <th className="w-10 px-4 py-3"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredTx.map((item) => (
-                                            <tr
-                                                key={`${item.id}-${item.installmentNum ?? 0}`}
-                                                className="group border-b border-[#F0EFED] last:border-b-0 hover:bg-[#F8F8F7]"
-                                            >
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <div
-                                                            className="size-2 shrink-0 rounded-full"
-                                                            style={{ background: item.type === 'ganho' ? '#059669' : '#2563EB' }}
-                                                        />
-                                                        <div>
-                                                            <div className="text-[#1A1917]">{item.title}</div>
-                                                            <div className="flex flex-wrap items-center gap-1 text-xs text-[#9B9A96]">
-                                                                {item.category?.name ?? 'Sem categoria'}
-                                                                {item.recurrence && (
-                                                                    <span className="rounded-full bg-[#EFF6FF] px-1.5 py-0.5 text-[#2563EB]">
-                                                                        mensal
-                                                                    </span>
-                                                                )}
-                                                                {item.installmentNum && (
-                                                                    <span className="rounded-full bg-[#F0EFED] px-1.5 py-0.5 text-[#6B6A67]">
-                                                                        {item.installmentNum}/{item.installmentsTotal}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className={`font-mono ${item.type === 'ganho' ? 'text-[#059669]' : 'text-[#3D3C3A]'}`}>
-                                                        {item.type === 'ganho' ? '+' : ''}{currency.format(item.amount)}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 font-mono text-[#6B6A67]">
-                                                    {item.resolvedDate}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <CyclePill label={item.cycle?.name ?? 'Sem ciclo'} />
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <StatusPill status={item.status} />
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <button className="flex size-7 items-center justify-center rounded-[6px] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#F0EFED]">
-                                                                <MoreHorizontal size={14} className="text-[#6B6A67]" />
-                                                            </button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            {item.status !== 'pago' && (
-                                                                <DropdownMenuItem onClick={() => markAsPaid(item.id)}>
-                                                                    Marcar como pago
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            <DropdownMenuItem onClick={() => openEditTx(item)}>
-                                                                Editar
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() => deleteTransaction(item)}
-                                                                className="text-[#DC2626] focus:text-[#DC2626]"
-                                                            >
-                                                                Remover
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {filteredTx.length === 0 && (
-                                <div className="p-6 text-sm text-[#9B9A96]">
-                                    Nenhum lançamento em {monthLabel}.
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Cycle cards */}
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            {cycles.map((cycle) => {
-                                const mth = cycleMthTotals[cycle.id] ?? { paid: 0, pending: 0 };
-                                const isOverbudget = mth.paid + mth.pending > cycle.expected_amount;
-                                return (
-                                    <div
-                                        key={cycle.id}
-                                        className="group relative overflow-hidden rounded-[12px] border border-[#E4E3E0] bg-white p-5"
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={openCreateTx}
+                                        className="flex h-9 items-center gap-1.5 rounded-[8px] bg-[#1A1917] px-4 text-sm text-white transition-colors hover:bg-[#3D3C3A]"
                                     >
-                                        <div className="flex items-start justify-between gap-2">
+                                        <Plus size={14} />
+                                        Novo lançamento
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Table */}
+                            <div className="overflow-hidden rounded-[12px] border border-[#E4E3E0] bg-white">
+                                {/* Header row */}
+                                <div className="hidden border-b border-[#E4E3E0] bg-[#F8F8F7] px-5 py-3 md:grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr_32px] md:gap-4">
+                                    {['Descrição', 'Valor', 'Vencimento', 'Ciclo', 'Status', ''].map((h) => (
+                                        <span key={h} className="text-xs uppercase tracking-wide text-[#9B9A96]">{h}</span>
+                                    ))}
+                                </div>
+
+                                {filteredTx.length === 0 ? (
+                                    <div className="px-5 py-8 text-center text-sm text-[#9B9A96]">
+                                        Nenhum lançamento encontrado.
+                                    </div>
+                                ) : (
+                                    filteredTx.map((item) => (
+                                        <div
+                                            key={`${item.id}-${item.installmentNum ?? 0}`}
+                                            className="group grid cursor-pointer grid-cols-1 items-center gap-2 border-b border-[#E4E3E0] px-5 py-2.5 last:border-0 hover:bg-[#F8F8F7] md:grid-cols-[2fr_1fr_1fr_1fr_1fr_32px] md:gap-4"
+                                        >
+                                            {/* Descrição */}
                                             <div>
                                                 <div className="flex items-center gap-2">
-                                                    <div className={`size-2 rounded-full ${isOverbudget ? 'bg-[#DC2626]' : mth.pending > 0 ? 'bg-[#D97706]' : 'bg-[#059669]'}`} />
-                                                    <span className="text-sm font-medium text-[#1A1917]">{cycle.name}</span>
+                                                    <p className="text-sm text-[#1A1917]">{item.title}</p>
+                                                    {item.recurrence && (
+                                                        <span className="rounded-full bg-purple-50 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[#7C3AED]">
+                                                            Recorrente
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <div className="mt-0.5 font-mono text-xs text-[#9B9A96]">
-                                                    {cycle.day_of_month ? `Dia ${cycle.day_of_month}` : 'Sem data fixa'}
+                                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                                    <span className="rounded-full bg-[#F0EFED] px-2 py-0.5 text-xs text-[#6B6A67]">
+                                                        {item.category?.name ?? 'Sem categoria'}
+                                                    </span>
+                                                    {item.installmentNum && (
+                                                        <span className="font-mono text-xs text-[#9B9A96]">
+                                                            {item.installmentNum}/{item.installmentsTotal} parcelas
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <button className="flex size-7 items-center justify-center rounded-[6px] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#F0EFED]">
-                                                        <MoreHorizontal size={14} className="text-[#6B6A67]" />
-                                                    </button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={() => openEditCycle(cycle)}>
-                                                        Editar ciclo
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => deleteCycle(cycle)}
-                                                        className="text-[#DC2626] focus:text-[#DC2626]"
-                                                    >
-                                                        Remover ciclo
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                        <div className="mt-3 font-mono text-[32px] font-semibold leading-none text-[#2563EB]">
-                                            {currency.format(cycle.expected_amount || 0)}
-                                        </div>
-                                        <div className="mt-4">
-                                            <ProgressBar
-                                                value={mth.paid + mth.pending}
-                                                max={cycle.expected_amount || 1}
-                                                height={6}
-                                                color={isOverbudget ? '#DC2626' : '#2563EB'}
-                                            />
-                                        </div>
-                                        <div className="mt-3 flex items-center justify-between text-xs">
-                                            <span className="font-mono text-[#059669]">Pago: {currency.format(mth.paid)}</span>
-                                            <span className="font-mono text-[#D97706]">Pendente: {currency.format(mth.pending)}</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
 
-                            {/* Card sem ciclo */}
-                            {cycleMthTotals[0] && (cycleMthTotals[0].paid > 0 || cycleMthTotals[0].pending > 0) && (() => {
-                                const noCycle = cycleMthTotals[0];
-                                const total = noCycle.paid + noCycle.pending;
-                                return (
-                                    <div className="overflow-hidden rounded-[12px] border border-dashed border-[#E4E3E0] bg-white p-5">
-                                        <div className="flex items-start justify-between gap-2">
+                                            {/* Valor */}
+                                            <span
+                                                className="font-mono text-sm"
+                                                style={{ color: item.type === 'ganho' ? '#059669' : '#1A1917' }}
+                                            >
+                                                {item.type === 'ganho' ? '+' : ''}
+                                                {currency.format(item.amount)}
+                                            </span>
+
+                                            {/* Vencimento */}
+                                            <span className="font-mono text-sm text-[#6B6A67]">
+                                                {item.resolvedDate}
+                                            </span>
+
+                                            {/* Ciclo */}
                                             <div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`size-2 rounded-full ${noCycle.pending > 0 ? 'bg-[#D97706]' : 'bg-[#059669]'}`} />
-                                                    <span className="text-sm font-medium text-[#9B9A96]">Sem ciclo</span>
-                                                </div>
-                                                <div className="mt-0.5 font-mono text-xs text-[#9B9A96]">Sem data fixa</div>
+                                                <CyclePill label={item.cycle?.name ?? 'Sem ciclo'} />
+                                            </div>
+
+                                            {/* Status */}
+                                            <div>
+                                                <StatusPill status={item.status} />
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <button className="flex size-7 items-center justify-center rounded-[6px] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#F0EFED]">
+                                                            <MoreHorizontal size={14} className="text-[#6B6A67]" />
+                                                        </button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        {item.status !== 'pago' && (
+                                                            <DropdownMenuItem onClick={() => markAsPaid(item.id)}>
+                                                                Marcar como pago
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        <DropdownMenuItem onClick={() => openEditTx(item)}>
+                                                            Editar
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() => deleteTransaction(item)}
+                                                            className="text-[#DC2626] focus:text-[#DC2626]"
+                                                        >
+                                                            Remover
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </div>
                                         </div>
-                                        <div className="mt-3 font-mono text-[32px] font-semibold leading-none text-[#9B9A96]">
-                                            {currency.format(total)}
-                                        </div>
-                                        <div className="mt-4">
-                                            <ProgressBar value={noCycle.paid} max={total || 1} height={6} color="#9B9A96" />
-                                        </div>
-                                        <div className="mt-3 flex items-center justify-between text-xs">
-                                            <span className="font-mono text-[#059669]">Pago: {currency.format(noCycle.paid)}</span>
-                                            <span className="font-mono text-[#D97706]">Pendente: {currency.format(noCycle.pending)}</span>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
+                                    ))
+                                )}
 
-                            {/* Card totais do mês */}
-                            <div className="rounded-[12px] border border-[#E4E3E0] bg-[#F8F8F7] p-5">
-                                <div className="text-xs uppercase tracking-wide text-[#9B9A96]">
-                                    Total · {monthLabel}
-                                </div>
-                                <div className="mt-2 font-mono text-2xl font-semibold text-[#1A1917]">
-                                    {currency.format(totals.expenses)}
-                                </div>
-                                <div className="mt-1 font-mono text-xs text-[#059669]">
-                                    Receitas: {currency.format(totals.income)}
-                                </div>
+                                {/* Total row */}
+                                {filteredTx.length > 0 && (
+                                    <div className="grid grid-cols-1 items-center gap-4 border-t-2 border-[#E4E3E0] bg-[#F8F8F7] px-5 py-3 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_32px]">
+                                        <span className="text-sm font-medium text-[#1A1917]">Total</span>
+                                        <span
+                                            className="font-mono text-sm font-medium"
+                                            style={{ color: tableTotal >= 0 ? '#059669' : '#1A1917' }}
+                                        >
+                                            {tableTotal >= 0 ? '+' : ''}
+                                            {currency.format(Math.abs(tableTotal))}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </>
@@ -1066,41 +424,63 @@ export default function Financeiro({ cycles, transactions, categories, members }
 
                 {/* ════════ TAB: HISTÓRICO ════════ */}
                 {mainTab === 'historico' && (
-                    <>
-                        <div className="flex items-center justify-between">
-                            <button
-                                type="button"
-                                onClick={() => setHistStart((s) => s - 3)}
-                                className="flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
-                            >
-                                <ChevronLeft size={14} />
-                                3 meses antes
-                            </button>
-                            <span className="font-mono text-xs text-[#9B9A96]">
-                                {monthProjections[0]?.label} — {monthProjections[5]?.label}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => setHistStart((s) => s + 3)}
-                                className="flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
-                            >
-                                Próximos 3
-                                <ChevronRight size={14} />
-                            </button>
-                        </div>
-
-                        <div className="flex flex-col gap-3">
-                            {monthProjections.map((mp) => (
-                                <MonthCard
-                                    key={`${mp.year}-${mp.month}`}
-                                    data={mp}
-                                    defaultExpanded={mp.phase !== 'past'}
-                                />
-                            ))}
-                        </div>
-                    </>
+                    <HistoricoView cycles={cycles} transactions={transactions} />
                 )}
             </div>
+
+            {/* ── Drawer: Novo Lançamento ──────────────────────────────────────── */}
+            <TxDrawer
+                open={txDrawerOpen}
+                onClose={() => setTxDrawerOpen(false)}
+                title="Novo lançamento"
+                submitLabel="Salvar lançamento"
+                onSubmit={submitCreateTx}
+                processing={txForm.processing}
+            >
+                <TxFormFields
+                    data={txForm.data as unknown as Record<string, string>}
+                    errors={txForm.errors}
+                    setData={(k, v) => txForm.setData(k as any, v)}
+                    cycles={cycles}
+                    categories={categories}
+                    members={members}
+                    assigneeIds={createAssignees}
+                    onAssigneesChange={setCreateAssignees}
+                />
+            </TxDrawer>
+
+            {/* ── Drawer: Editar Lançamento ────────────────────────────────────── */}
+            <TxDrawer
+                open={!!editingTx}
+                onClose={() => setEditingTx(null)}
+                title="Editar lançamento"
+                submitLabel="Salvar alterações"
+                onSubmit={submitEditTx}
+                processing={editTxForm.processing}
+            >
+                <TxFormFields
+                    data={editTxForm.data as unknown as Record<string, string>}
+                    errors={editTxForm.errors}
+                    setData={(k, v) => editTxForm.setData(k as any, v)}
+                    cycles={cycles}
+                    categories={categories}
+                    members={members}
+                    assigneeIds={editAssignees}
+                    onAssigneesChange={setEditAssignees}
+                />
+                {editingTx && (
+                    <div className="border-t border-[#F0EFED] pt-4">
+                        <button
+                            type="button"
+                            onClick={() => { deleteTransaction(editingTx); setEditingTx(null); }}
+                            className="flex items-center gap-1.5 text-sm text-[#DC2626] hover:underline"
+                        >
+                            <Trash2 size={13} />
+                            Remover lançamento
+                        </button>
+                    </div>
+                )}
+            </TxDrawer>
 
             {/* ── Dialog: Novo Ciclo ───────────────────────────────────────────── */}
             <Dialog open={cycleDialogOpen} onOpenChange={setCycleDialogOpen}>
@@ -1114,6 +494,7 @@ export default function Financeiro({ cycles, transactions, categories, members }
                                 onChange={(e) => cycleForm.setData('name', e.target.value)}
                                 placeholder="Ex: Dia 10"
                             />
+                            <InputError message={cycleForm.errors.name} />
                         </div>
                         <div className="grid gap-2">
                             <Label>Dia do mês</Label>
@@ -1147,7 +528,11 @@ export default function Financeiro({ cycles, transactions, categories, members }
                     <form onSubmit={submitEditCycle} className="grid gap-4 pt-2">
                         <div className="grid gap-2">
                             <Label>Nome</Label>
-                            <Input value={editCycleForm.data.name} onChange={(e) => editCycleForm.setData('name', e.target.value)} />
+                            <Input
+                                value={editCycleForm.data.name}
+                                onChange={(e) => editCycleForm.setData('name', e.target.value)}
+                            />
+                            <InputError message={editCycleForm.errors.name} />
                         </div>
                         <div className="grid gap-2">
                             <Label>Dia do mês</Label>
@@ -1172,59 +557,13 @@ export default function Financeiro({ cycles, transactions, categories, members }
                 </DialogContent>
             </Dialog>
 
-            {/* ── Sheet: Novo Lançamento ───────────────────────────────────────── */}
-            <Sheet open={txSheetOpen} onOpenChange={setTxSheetOpen}>
-                <SheetContent side="right" className="w-full sm:max-w-md">
-                    <SheetHeader><SheetTitle>Novo lançamento</SheetTitle></SheetHeader>
-                    <form onSubmit={submitCreateTx} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-2">
-                        <TxFormFields
-                            data={txForm.data as unknown as Record<string, string>}
-                            setData={(k, v) => txForm.setData(k as any, v)}
-                            cycles={cycles}
-                            categories={categories}
-                            members={members}
-                            assigneeIds={createAssignees}
-                            onAssigneesChange={setCreateAssignees}
-                        />
-                        <SheetFooter>
-                            <Button type="submit" disabled={txForm.processing}>Salvar lançamento</Button>
-                        </SheetFooter>
-                    </form>
-                </SheetContent>
-            </Sheet>
-
-            {/* ── Sheet: Editar Lançamento ─────────────────────────────────────── */}
-            <Sheet open={!!editingTx} onOpenChange={(open) => !open && setEditingTx(null)}>
-                <SheetContent side="right" className="w-full sm:max-w-md">
-                    <SheetHeader><SheetTitle>Editar lançamento</SheetTitle></SheetHeader>
-                    <form onSubmit={submitEditTx} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-2">
-                        <TxFormFields
-                            data={editTxForm.data as unknown as Record<string, string>}
-                            setData={(k, v) => editTxForm.setData(k as any, v)}
-                            cycles={cycles}
-                            categories={categories}
-                            members={members}
-                            assigneeIds={editAssignees}
-                            onAssigneesChange={setEditAssignees}
-                        />
-                        {editingTx && (
-                            <div className="mt-2 border-t border-[#F0EFED] pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => { deleteTransaction(editingTx); setEditingTx(null); }}
-                                    className="flex items-center gap-1.5 text-sm text-[#DC2626] hover:underline"
-                                >
-                                    <Trash2 size={13} />
-                                    Remover lançamento
-                                </button>
-                            </div>
-                        )}
-                        <SheetFooter>
-                            <Button type="submit" disabled={editTxForm.processing}>Salvar alterações</Button>
-                        </SheetFooter>
-                    </form>
-                </SheetContent>
-            </Sheet>
+            {/* ── Confirm: Remover ─────────────────────────────────────────────── */}
+            <ConfirmDialog
+                open={!!pendingDelete}
+                description={`Tem certeza que deseja remover "${pendingDelete?.label}"?`}
+                onConfirm={() => { pendingDelete?.action(); setPendingDelete(null); }}
+                onCancel={() => setPendingDelete(null)}
+            />
         </AppLayout>
     );
 }

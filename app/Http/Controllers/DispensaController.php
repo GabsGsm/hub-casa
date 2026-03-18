@@ -56,7 +56,7 @@ class DispensaController extends Controller
             'category' => $data['category'] ?? null,
         ]);
 
-        return redirect()->route('dispensa')->with('success', 'Item criado.');
+        return redirect()->route('dispensa.index')->with('success', 'Item criado.');
     }
 
     public function update(UpdatePantryItemRequest $request, PantryItem $item): RedirectResponse
@@ -66,7 +66,7 @@ class DispensaController extends Controller
         $item->fill(array_filter($request->validated(), fn ($value) => $value !== null));
         $item->save();
 
-        return redirect()->route('dispensa')->with('success', 'Item atualizado.');
+        return redirect()->route('dispensa.index')->with('success', 'Item atualizado.');
     }
 
     public function destroy(Request $request, PantryItem $item): RedirectResponse
@@ -74,7 +74,7 @@ class DispensaController extends Controller
         $this->ensureCanEdit($request, $item);
         $item->delete();
 
-        return redirect()->route('dispensa')->with('success', 'Item removido.');
+        return redirect()->route('dispensa.index')->with('success', 'Item removido.');
     }
 
     private function ensureCanEdit(Request $request, PantryItem $item): void

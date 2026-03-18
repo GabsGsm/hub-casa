@@ -30,58 +30,74 @@ Route::middleware('auth')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])
             ->name('dashboard');
 
-        Route::get('/financeiro', [FinanceiroController::class, 'index'])
-            ->name('financeiro');
-        Route::post('/financeiro/ciclos', [FinanceiroController::class, 'storeCycle'])
-            ->name('financeiro.ciclos.store');
-        Route::put('/financeiro/ciclos/{cycle}', [FinanceiroController::class, 'updateCycle'])
-            ->name('financeiro.ciclos.update');
-        Route::delete('/financeiro/ciclos/{cycle}', [FinanceiroController::class, 'destroyCycle'])
-            ->name('financeiro.ciclos.destroy');
-        Route::post('/financeiro/lancamentos', [FinanceiroController::class, 'storeTransaction'])
-            ->name('financeiro.lancamentos.store');
-        Route::put('/financeiro/lancamentos/{transaction}', [FinanceiroController::class, 'updateTransaction'])
-            ->name('financeiro.lancamentos.update');
-        Route::delete('/financeiro/lancamentos/{transaction}', [FinanceiroController::class, 'destroyTransaction'])
-            ->name('financeiro.lancamentos.destroy');
+        Route::prefix('financeiro')->name('financeiro.')->group(function () {
+            Route::get('/', [FinanceiroController::class, 'index'])
+                ->name('index');
 
-        Route::get('/tarefas', [TarefasController::class, 'index'])
-            ->name('tarefas');
-        Route::post('/tarefas', [TarefasController::class, 'store'])
-            ->name('tarefas.store');
-        Route::put('/tarefas/{task}', [TarefasController::class, 'update'])
-            ->name('tarefas.update');
-        Route::patch('/tarefas/{task}/move', [TarefasController::class, 'move'])
-            ->name('tarefas.move');
-        Route::delete('/tarefas/{task}', [TarefasController::class, 'destroy'])
-            ->name('tarefas.destroy');
+            Route::prefix('ciclos')->name('ciclos.')->group(function () {
+                Route::post('/', [FinanceiroController::class, 'storeCycle'])
+                    ->name('store');
+                Route::put('/{cycle}', [FinanceiroController::class, 'updateCycle'])
+                    ->name('update');
+                Route::delete('/{cycle}', [FinanceiroController::class, 'destroyCycle'])
+                    ->name('destroy');
+            });
 
-        Route::get('/agenda', [AgendaController::class, 'index'])
-            ->name('agenda');
-        Route::post('/agenda', [AgendaController::class, 'store'])
-            ->name('agenda.store');
-        Route::put('/agenda/{event}', [AgendaController::class, 'update'])
-            ->name('agenda.update');
-        Route::delete('/agenda/{event}', [AgendaController::class, 'destroy'])
-            ->name('agenda.destroy');
+            Route::prefix('lancamentos')->name('lancamentos.')->group(function () {
+                Route::post('/', [FinanceiroController::class, 'storeTransaction'])
+                    ->name('store');
+                Route::put('/{transaction}', [FinanceiroController::class, 'updateTransaction'])
+                    ->name('update');
+                Route::delete('/{transaction}', [FinanceiroController::class, 'destroyTransaction'])
+                    ->name('destroy');
+            });
+        });
 
-        Route::get('/compras', [ComprasController::class, 'index'])
-            ->name('compras');
-        Route::post('/compras', [ComprasController::class, 'store'])
-            ->name('compras.store');
-        Route::put('/compras/{item}', [ComprasController::class, 'update'])
-            ->name('compras.update');
-        Route::delete('/compras/{item}', [ComprasController::class, 'destroy'])
-            ->name('compras.destroy');
+        Route::prefix('tarefas')->name('tarefas.')->group(function () {
+            Route::get('/', [TarefasController::class, 'index'])
+                ->name('index');
+            Route::post('/', [TarefasController::class, 'store'])
+                ->name('store');
+            Route::put('/{task}', [TarefasController::class, 'update'])
+                ->name('update');
+            Route::patch('/{task}/move', [TarefasController::class, 'move'])
+                ->name('move');
+            Route::delete('/{task}', [TarefasController::class, 'destroy'])
+                ->name('destroy');
+        });
 
-        Route::get('/dispensa', [DispensaController::class, 'index'])
-            ->name('dispensa');
-        Route::post('/dispensa', [DispensaController::class, 'store'])
-            ->name('dispensa.store');
-        Route::put('/dispensa/{item}', [DispensaController::class, 'update'])
-            ->name('dispensa.update');
-        Route::delete('/dispensa/{item}', [DispensaController::class, 'destroy'])
-            ->name('dispensa.destroy');
+        Route::prefix('agenda')->name('agenda.')->group(function () {
+            Route::get('/', [AgendaController::class, 'index'])
+                ->name('index');
+            Route::post('/', [AgendaController::class, 'store'])
+                ->name('store');
+            Route::put('/{event}', [AgendaController::class, 'update'])
+                ->name('update');
+            Route::delete('/{event}', [AgendaController::class, 'destroy'])
+                ->name('destroy');
+        });
+
+        Route::prefix('compras')->name('compras.')->group(function () {
+            Route::get('/', [ComprasController::class, 'index'])
+                ->name('index');
+            Route::post('/', [ComprasController::class, 'store'])
+                ->name('store');
+            Route::put('/{item}', [ComprasController::class, 'update'])
+                ->name('update');
+            Route::delete('/{item}', [ComprasController::class, 'destroy'])
+                ->name('destroy');
+        });
+
+        Route::prefix('dispensa')->name('dispensa.')->group(function () {
+            Route::get('/', [DispensaController::class, 'index'])
+                ->name('index');
+            Route::post('/', [DispensaController::class, 'store'])
+                ->name('store');
+            Route::put('/{item}', [DispensaController::class, 'update'])
+                ->name('update');
+            Route::delete('/{item}', [DispensaController::class, 'destroy'])
+                ->name('destroy');
+        });
     });
 });
 

@@ -60,7 +60,7 @@ class ComprasController extends Controller
             'priority' => $data['priority'] ?? 'normal',
         ]);
 
-        return redirect()->route('compras')->with('success', 'Item adicionado.');
+        return redirect()->route('compras.index')->with('success', 'Item adicionado.');
     }
 
     public function update(UpdateShoppingItemRequest $request, ShoppingList $item): RedirectResponse
@@ -70,7 +70,7 @@ class ComprasController extends Controller
         $item->fill(array_filter($request->validated(), fn ($value) => $value !== null));
         $item->save();
 
-        return redirect()->route('compras')->with('success', 'Item atualizado.');
+        return redirect()->route('compras.index')->with('success', 'Item atualizado.');
     }
 
     public function destroy(Request $request, ShoppingList $item): RedirectResponse
@@ -78,7 +78,7 @@ class ComprasController extends Controller
         $this->ensureCanEdit($request, $item);
         $item->delete();
 
-        return redirect()->route('compras')->with('success', 'Item removido.');
+        return redirect()->route('compras.index')->with('success', 'Item removido.');
     }
 
     private function ensureCanEdit(Request $request, ShoppingList $item): void

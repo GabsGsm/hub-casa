@@ -1,6 +1,8 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Ban, Check, Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import InputError from '@/components/input-error';
+import { ConfirmDialog } from '@/components/hub/confirm-dialog';
 import { ProgressBar } from '@/components/hub/progress-bar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +22,8 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import AppLayout from '@/layouts/app-layout';
+import { CATEGORY_OPTIONS, UNIT_OPTIONS } from '@/lib/inventory-constants';
+import { ItemRow } from './components/item-row';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ShoppingItem = {
@@ -39,15 +43,12 @@ type ComprasProps = {
 
 type Filter = 'todos' | 'pendente' | 'comprado' | 'impossibilitado';
 
-const UNIT_OPTIONS = ['un', 'kg', 'g', 'l', 'ml', 'cx', 'pct', 'dz'];
-const CATEGORY_OPTIONS = ['Alimentação', 'Limpeza', 'Higiene', 'Pet', 'Bebidas', 'Outros'];
-
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function Compras({ items }: ComprasProps) {
     const [filter, setFilter] = useState<Filter>('todos');
     const [sheetOpen, setSheetOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
     const [inlineValue, setInlineValue] = useState('');
+    const [pendingDelete, setPendingDelete] = useState<{ action: () => void; label: string } | null>(null);
     const inlineRef = useRef<HTMLInputElement>(null);
 
     // ── Forms ────────────────────────────────────────────────────────────────
@@ -89,9 +90,11 @@ export default function Compras({ items }: ComprasProps) {
         router.put(`/compras/${item.id}`, { status: next }, { preserveScroll: true });
     }
 
-    function handleDelete(id: number) {
-        if (!confirm('Remover este item?')) return;
-        router.delete(`/compras/${id}`, { preserveScroll: true });
+    function handleDelete(id: number, label: string) {
+        setPendingDelete({
+            action: () => router.delete(`/compras/${id}`, { preserveScroll: true }),
+            label,
+        });
     }
 
     function openEdit(item: ShoppingItem) {
@@ -123,65 +126,6 @@ export default function Compras({ items }: ComprasProps) {
         { key: 'comprado', label: 'Comprados', count: done },
         { key: 'impossibilitado', label: 'Impeditivos', count: items.filter(i => i.status === 'impossibilitado').length },
     ];
-
-    // ── Item Row ──────────────────────────────────────────────────────────────
-    function ItemRow({ item }: { item: ShoppingItem }) {
-        const isPurchased = item.status === 'comprado';
-        const isBlocked = item.status === 'impossibilitado';
-        return (
-            <div
-                className="group flex cursor-pointer items-center gap-3 rounded-[8px] px-3 py-2.5 transition-colors hover:bg-[#F8F8F7]"
-                onClick={() => openEdit(item)}
-            >
-                {/* Checkbox / blocked icon */}
-                <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); toggleStatus(item); }}
-                    className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                        isPurchased
-                            ? 'border-[#059669] bg-[#059669]'
-                            : isBlocked
-                              ? 'border-[#D97706] bg-[#D97706]'
-                              : 'border-[#E4E3E0] hover:border-[#059669]'
-                    }`}
-                >
-                    {isPurchased && <Check size={10} strokeWidth={3} className="text-white" />}
-                    {isBlocked && <Ban size={10} strokeWidth={3} className="text-white" />}
-                </button>
-
-                {/* Priority dot */}
-                {item.priority === 'high' && !isPurchased && !isBlocked && (
-                    <div className="size-1.5 shrink-0 rounded-full bg-[#DC2626]" />
-                )}
-
-                {/* Name + meta */}
-                <div className="min-w-0 flex-1">
-                    <span className={`text-sm ${isPurchased ? 'text-[#9B9A96] line-through' : isBlocked ? 'text-[#D97706]' : 'text-[#1A1917]'}`}>
-                        {item.name}
-                    </span>
-                    <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-[#9B9A96]">
-                            {item.quantity} {item.unit}
-                        </span>
-                        {item.category && (
-                            <span className="rounded-full bg-[#F0EFED] px-2 py-0.5 text-[10px] text-[#6B6A67]">
-                                {item.category}
-                            </span>
-                        )}
-                    </div>
-                </div>
-
-                {/* Delete */}
-                <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                    className="shrink-0 rounded p-1 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500"
-                >
-                    <Trash2 size={13} className="text-[#9B9A96]" />
-                </button>
-            </div>
-        );
-    }
 
     return (
         <AppLayout breadcrumbs={[
@@ -275,7 +219,13 @@ export default function Compras({ items }: ComprasProps) {
                                     )}
                                     <div className="p-2">
                                         {pendentes.map((item) => (
-                                            <ItemRow key={item.id} item={item} />
+                                            <ItemRow
+                                                key={item.id}
+                                                item={item}
+                                                onEdit={openEdit}
+                                                onToggleStatus={toggleStatus}
+                                                onDelete={handleDelete}
+                                            />
                                         ))}
                                     </div>
                                 </div>
@@ -291,7 +241,13 @@ export default function Compras({ items }: ComprasProps) {
                                     </div>
                                     <div className="p-2">
                                         {impossibilitados.map((item) => (
-                                            <ItemRow key={item.id} item={item} />
+                                            <ItemRow
+                                                key={item.id}
+                                                item={item}
+                                                onEdit={openEdit}
+                                                onToggleStatus={toggleStatus}
+                                                onDelete={handleDelete}
+                                            />
                                         ))}
                                     </div>
                                 </div>
@@ -307,7 +263,13 @@ export default function Compras({ items }: ComprasProps) {
                                     </div>
                                     <div className="p-2">
                                         {comprados.map((item) => (
-                                            <ItemRow key={item.id} item={item} />
+                                            <ItemRow
+                                                key={item.id}
+                                                item={item}
+                                                onEdit={openEdit}
+                                                onToggleStatus={toggleStatus}
+                                                onDelete={handleDelete}
+                                            />
                                         ))}
                                     </div>
                                 </div>
@@ -331,6 +293,7 @@ export default function Compras({ items }: ComprasProps) {
                                 value={editForm.data.name}
                                 onChange={(e) => editForm.setData('name', e.target.value)}
                             />
+                            <InputError message={editForm.errors.name} />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="grid gap-2">
@@ -339,6 +302,7 @@ export default function Compras({ items }: ComprasProps) {
                                     value={editForm.data.quantity}
                                     onChange={(e) => editForm.setData('quantity', e.target.value)}
                                 />
+                                <InputError message={editForm.errors.quantity} />
                             </div>
                             <div className="grid gap-2">
                                 <Label>Unidade</Label>
@@ -401,7 +365,7 @@ export default function Compras({ items }: ComprasProps) {
                             <div className="mt-2 border-t border-[#F0EFED] pt-4">
                                 <button
                                     type="button"
-                                    onClick={() => { handleDelete(editingItem.id); setSheetOpen(false); }}
+                                    onClick={() => { handleDelete(editingItem.id, editingItem.name); setSheetOpen(false); }}
                                     className="flex items-center gap-1.5 text-sm text-[#DC2626] hover:underline"
                                 >
                                     <Trash2 size={13} />
@@ -418,6 +382,14 @@ export default function Compras({ items }: ComprasProps) {
                     </form>
                 </SheetContent>
             </Sheet>
+
+            {/* ── Confirm: Remover item ─────────────────────────────────────── */}
+            <ConfirmDialog
+                open={!!pendingDelete}
+                description={`Tem certeza que deseja remover "${pendingDelete?.label}" da lista?`}
+                onConfirm={() => { pendingDelete?.action(); setPendingDelete(null); }}
+                onCancel={() => setPendingDelete(null)}
+            />
         </AppLayout>
     );
 }

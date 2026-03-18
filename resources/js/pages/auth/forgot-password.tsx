@@ -11,7 +11,7 @@ import { email } from '@/routes/password';
 
 export default function ForgotPassword({ status }: { status?: string }) {
     return (
-        <AuthLayout title="Esqueci minha senha" description="Digite seu e-mail para receber o link de redefinição">
+        <AuthLayout description="Informe seu e-mail para redefinir a senha">
             <Head title="Esqueci minha senha" />
             {status && (
                 <div className="mb-4 rounded-[8px] bg-[#F0FDF4] px-4 py-3 text-center text-sm font-medium text-[#15803D]">

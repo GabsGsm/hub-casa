@@ -87,7 +87,7 @@ class TarefasController extends Controller
             $task->assignees()->sync($validated['assignee_ids']);
         }
 
-        return redirect()->route('tarefas')->with('success', 'Tarefa criada.');
+        return redirect()->route('tarefas.index')->with('success', 'Tarefa criada.');
     }
 
     public function update(Request $request, Task $task)
@@ -111,7 +111,7 @@ class TarefasController extends Controller
             $task->assignees()->sync($validated['assignee_ids'] ?? []);
         }
 
-        return redirect()->route('tarefas')->with('success', 'Tarefa atualizada.');
+        return redirect()->route('tarefas.index')->with('success', 'Tarefa atualizada.');
     }
 
     public function destroy(Request $request, Task $task)
@@ -120,7 +120,7 @@ class TarefasController extends Controller
         $task->assignees()->detach();
         $task->delete();
 
-        return redirect()->route('tarefas')->with('success', 'Tarefa removida.');
+        return redirect()->route('tarefas.index')->with('success', 'Tarefa removida.');
     }
 
     public function move(Request $request, Task $task)
@@ -136,7 +136,7 @@ class TarefasController extends Controller
         $task->sort_order = $validated['sort_order'] ?? $task->sort_order;
         $task->save();
 
-        return redirect()->route('tarefas')->with('success', 'Tarefa movida.');
+        return redirect()->route('tarefas.index')->with('success', 'Tarefa movida.');
     }
 
     private function ensureCanEdit(Request $request, Task $task): void

@@ -3,15 +3,13 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
-    Clock,
     List,
     Plus,
     Trash2,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { ConfirmDialog } from '@/components/hub/confirm-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Sheet,
     SheetContent,
@@ -19,140 +17,20 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { EventFormFields } from './components/event-form-fields';
+import { EventRow } from './components/event-row';
+import type { AgendaEvent, AgendaProps, EventFormData, View } from './types';
+import {
+    DAY_NAMES_FULL,
+    DAY_NAMES_SHORT,
+    formatDateBR,
+    formatMonthYear,
+    getDaysInMonth,
+    getFirstDayOfWeek,
+    todayStr,
+} from './utils';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-type AgendaEvent = {
-    id: number;
-    title: string;
-    description: string | null;
-    date: string; // YYYY-MM-DD
-    time: string; // HH:MM
-};
-
-type AgendaProps = {
-    events: AgendaEvent[];
-};
-
-type View = 'monthly' | 'weekly' | 'list';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const MONTH_NAMES = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-];
-const DAY_NAMES_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const DAY_NAMES_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-
-function todayStr() {
-    return new Date().toISOString().slice(0, 10);
-}
-
-function formatDateBR(dateStr: string) {
-    const [, m, d] = dateStr.split('-');
-    return `${d}/${m}`;
-}
-
-function formatMonthYear(year: number, month: number) {
-    return `${MONTH_NAMES[month]} ${year}`;
-}
-
-function getDaysInMonth(year: number, month: number) {
-    return new Date(year, month + 1, 0).getDate();
-}
-
-function getFirstDayOfWeek(year: number, month: number) {
-    return new Date(year, month, 1).getDay(); // 0=Sun
-}
-
-// ── Event Form ────────────────────────────────────────────────────────────────
-type EventFormData = { title: string; description: string; date: string; time: string };
-
-function EventFormFields({
-    data,
-    setData,
-}: {
-    data: EventFormData;
-    setData: (key: keyof EventFormData, value: string) => void;
-}) {
-    return (
-        <>
-            <div className="grid gap-2">
-                <Label>Título</Label>
-                <Input
-                    autoFocus
-                    value={data.title}
-                    onChange={(e) => setData('title', e.target.value)}
-                    placeholder="Ex: Consulta médica"
-                />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-2">
-                    <Label>Data</Label>
-                    <Input
-                        type="date"
-                        value={data.date}
-                        onChange={(e) => setData('date', e.target.value)}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label>Horário</Label>
-                    <Input
-                        type="time"
-                        value={data.time}
-                        onChange={(e) => setData('time', e.target.value)}
-                    />
-                </div>
-            </div>
-            <div className="grid gap-2">
-                <Label>Descrição (opcional)</Label>
-                <Textarea
-                    value={data.description}
-                    onChange={(e) => setData('description', e.target.value)}
-                    placeholder="Detalhes do compromisso..."
-                    rows={3}
-                />
-            </div>
-        </>
-    );
-}
-
-// ── Event Row ─────────────────────────────────────────────────────────────────
-function EventRow({
-    event,
-    onEdit,
-    onDelete,
-}: {
-    event: AgendaEvent;
-    onEdit: (e: AgendaEvent) => void;
-    onDelete: (id: number) => void;
-}) {
-    return (
-        <div
-            className="group flex cursor-pointer items-start gap-3 rounded-[8px] px-3 py-2.5 transition-colors hover:bg-[#F8F8F7]"
-            onClick={() => onEdit(event)}
-        >
-            <div className="mt-0.5 size-2 shrink-0 rounded-full bg-[#D97706]" />
-            <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-[#1A1917]">{event.title}</p>
-                <div className="mt-0.5 flex items-center gap-1.5">
-                    <Clock size={11} className="text-[#9B9A96]" />
-                    <span className="font-mono text-xs text-[#9B9A96]">{event.time}</span>
-                </div>
-            </div>
-            <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onDelete(event.id); }}
-                className="shrink-0 rounded p-1 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500"
-            >
-                <Trash2 size={13} className="text-[#9B9A96]" />
-            </button>
-        </div>
-    );
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function Agenda({ events }: AgendaProps) {
     const today = todayStr();
     const [view, setView] = useState<View>('monthly');
@@ -166,6 +44,7 @@ export default function Agenda({ events }: AgendaProps) {
 
     // Weekly state
     const [weekOffset, setWeekOffset] = useState(0);
+    const [pendingDelete, setPendingDelete] = useState<{ action: () => void; label: string } | null>(null);
 
     // ── Create form ──────────────────────────────────────────────────────────
     const createForm = useForm<EventFormData>({
@@ -234,9 +113,11 @@ export default function Agenda({ events }: AgendaProps) {
         setSheetOpen(true);
     }
 
-    function handleDelete(id: number) {
-        if (!confirm('Remover este compromisso?')) return;
-        router.delete(`/agenda/${id}`, { preserveScroll: true });
+    function handleDelete(id: number, label: string) {
+        setPendingDelete({
+            action: () => router.delete(`/agenda/${id}`, { preserveScroll: true }),
+            label,
+        });
     }
 
     function submitCreate(e: React.FormEvent) {
@@ -267,7 +148,7 @@ export default function Agenda({ events }: AgendaProps) {
 
     const selectedDayEvents = eventsByDate[selectedDay] ?? [];
 
-    // ── Sorted future events for list view ────────────────────────────────────
+    // ── Sorted events for list view ────────────────────────────────────────────
     const sortedEvents = useMemo(() =>
         [...events].sort((a, b) =>
             a.date !== b.date ? a.date.localeCompare(b.date) : a.time.localeCompare(b.time),
@@ -549,11 +430,13 @@ export default function Agenda({ events }: AgendaProps) {
                         {editingEvent ? (
                             <EventFormFields
                                 data={editForm.data}
+                                errors={editForm.errors}
                                 setData={(k, v) => editForm.setData(k, v)}
                             />
                         ) : (
                             <EventFormFields
                                 data={createForm.data}
+                                errors={createForm.errors}
                                 setData={(k, v) => createForm.setData(k, v)}
                             />
                         )}
@@ -562,7 +445,7 @@ export default function Agenda({ events }: AgendaProps) {
                             <div className="mt-2 border-t border-[#F0EFED] pt-4">
                                 <button
                                     type="button"
-                                    onClick={() => { handleDelete(editingEvent.id); setSheetOpen(false); }}
+                                    onClick={() => { handleDelete(editingEvent.id, editingEvent.title); setSheetOpen(false); }}
                                     className="flex items-center gap-1.5 text-sm text-[#DC2626] hover:underline"
                                 >
                                     <Trash2 size={13} />
@@ -582,6 +465,14 @@ export default function Agenda({ events }: AgendaProps) {
                     </form>
                 </SheetContent>
             </Sheet>
+
+            {/* ── Confirm: Remover compromisso ─────────────────────────────────── */}
+            <ConfirmDialog
+                open={!!pendingDelete}
+                description={`Tem certeza que deseja remover "${pendingDelete?.label}"?`}
+                onConfirm={() => { pendingDelete?.action(); setPendingDelete(null); }}
+                onCancel={() => setPendingDelete(null)}
+            />
         </AppLayout>
     );
 }

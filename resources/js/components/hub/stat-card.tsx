@@ -10,26 +10,23 @@ export function StatCard({
     className = '',
 }: {
     label: string;
-    value: ReactNode;
+    value?: ReactNode;
     caption?: ReactNode;
     accent?: string;
     children?: ReactNode;
     className?: string;
 }) {
     return (
-        /* Figma: bg-white border border-[#E4E3E0] rounded-[12px] p-5 */
         <div className={cn('flex flex-col gap-2 rounded-[12px] border border-[#E4E3E0] bg-white p-5', className)}>
-            {/* label: text-xs uppercase tracking-wide text-[#9B9A96] mb-2 */}
-            <p className="text-xs uppercase tracking-wide text-[#9B9A96]">
-                {label}
-            </p>
-            {/* value: text-[28px] font-semibold font-mono leading-none */}
-            <div
-                className="font-mono text-[28px] font-semibold leading-none"
-                style={{ color: accent ?? '#1A1917' }}
-            >
-                {value}
-            </div>
+            <p className="text-xs uppercase tracking-wide text-[#9B9A96]">{label}</p>
+            {value !== undefined && (
+                <div
+                    className="font-mono text-[28px] font-semibold leading-none"
+                    style={{ color: accent ?? '#1A1917' }}
+                >
+                    {value}
+                </div>
+            )}
             {caption && (
                 <div className="font-mono text-xs" style={{ color: '#9B9A96' }}>
                     {caption}

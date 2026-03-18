@@ -37,21 +37,21 @@ class FinanceiroController extends Controller
             $request->validated(),
         );
 
-        return redirect()->route('financeiro')->with('success', 'Ciclo criado.');
+        return redirect()->route('financeiro.index')->with('success', 'Ciclo criado.');
     }
 
     public function updateCycle(UpdateCycleRequest $request, PaymentCycle $cycle): RedirectResponse
     {
         $this->service->updateCycle($request->user()->house, $cycle, $request->validated());
 
-        return redirect()->route('financeiro')->with('success', 'Ciclo atualizado.');
+        return redirect()->route('financeiro.index')->with('success', 'Ciclo atualizado.');
     }
 
     public function destroyCycle(Request $request, PaymentCycle $cycle): RedirectResponse
     {
         $this->service->deleteCycle($request->user()->house, $cycle);
 
-        return redirect()->route('financeiro')->with('success', 'Ciclo removido.');
+        return redirect()->route('financeiro.index')->with('success', 'Ciclo removido.');
     }
 
     public function storeTransaction(StoreTransactionRequest $request): RedirectResponse
@@ -62,7 +62,7 @@ class FinanceiroController extends Controller
             $request->validated(),
         );
 
-        return redirect()->route('financeiro')->with('success', 'Lançamento criado.');
+        return redirect()->route('financeiro.index')->with('success', 'Lançamento criado.');
     }
 
     public function updateTransaction(
@@ -76,13 +76,13 @@ class FinanceiroController extends Controller
             $request->validated(),
         );
 
-        return redirect()->route('financeiro')->with('success', 'Lançamento atualizado.');
+        return redirect()->route('financeiro.index')->with('success', 'Lançamento atualizado.');
     }
 
     public function destroyTransaction(Request $request, FinancialTransaction $transaction): RedirectResponse
     {
         $this->service->deleteTransaction($request->user(), $transaction);
 
-        return redirect()->route('financeiro')->with('success', 'Lançamento removido.');
+        return redirect()->route('financeiro.index')->with('success', 'Lançamento removido.');
     }
 }

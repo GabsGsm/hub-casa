@@ -144,7 +144,7 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Features::registration(), // desativado — cadastro apenas via painel admin
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

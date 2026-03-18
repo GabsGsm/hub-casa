@@ -15,10 +15,7 @@ export default function Onboarding({ user }: { user: { name: string; email: stri
     }
 
     return (
-        <AuthLayout
-            title={`Olá, ${user.name.split(' ')[0]} 👋`}
-            description="Vamos criar sua casa para começar a organizar tudo."
-        >
+        <AuthLayout description={`Olá, ${user.name.split(' ')[0]}! Configure sua casa.`}>
             <Head title="Criar casa" />
             <form onSubmit={submit} className="flex flex-col gap-5">
                 <div className="flex flex-col gap-1.5">

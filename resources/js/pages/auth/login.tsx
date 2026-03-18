@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
-import { register } from '@/routes';
+//import { register } from '@/routes';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 
@@ -20,7 +20,7 @@ type Props = {
 
 export default function Login({ status, canResetPassword, canRegister }: Props) {
     return (
-        <AuthLayout title="Entrar na sua conta" description="Digite seu e-mail e senha para continuar">
+        <AuthLayout description="Bem-vindo de volta">
             <Head title="Entrar" />
 
             {status && (
@@ -93,7 +93,7 @@ export default function Login({ status, canResetPassword, canRegister }: Props) 
                         {canRegister && (
                             <div className="text-center text-sm text-[#9B9A96]">
                                 Não tem conta?{' '}
-                                <TextLink href={register()} tabIndex={6}>
+                                <TextLink href={"#"} tabIndex={6}>
                                     Criar conta
                                 </TextLink>
                             </div>

@@ -1,58 +1,49 @@
-import { usePage } from '@inertiajs/react';
-import { ChevronsUpDown } from 'lucide-react';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    useSidebar,
-} from '@/components/ui/sidebar';
-import { UserInfo } from '@/components/user-info';
-import { UserMenuContent } from '@/components/user-menu-content';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { Link, usePage, router } from '@inertiajs/react';
+import { LogOut, Settings } from 'lucide-react';
+import { useInitials } from '@/hooks/use-initials';
+
+function AvatarCircle({ name, size = 28 }: { name: string; size?: number }) {
+    const getInitials = useInitials();
+    const initials = getInitials(name);
+    return (
+        <div
+            style={{ width: size, height: size, fontSize: size * 0.38 }}
+            className="flex shrink-0 items-center justify-center rounded-full bg-[#1A1917] font-medium text-white"
+        >
+            {initials}
+        </div>
+    );
+}
 
 export function NavUser() {
     const { auth } = usePage().props;
     const { house } = usePage().props;
-    const { state } = useSidebar();
-    const isMobile = useIsMobile();
+
+    function handleLogout() {
+        router.post('/logout');
+    }
 
     return (
-        <SidebarMenu>
-            <SidebarMenuItem>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <SidebarMenuButton
-                            size="lg"
-                            className="group text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent"
-                            data-test="sidebar-menu-button"
-                        >
-                            <UserInfo
-                                user={auth.user}
-                                subtitle={house?.name ?? null}
-                            />
-                            <ChevronsUpDown className="ml-auto size-4" />
-                        </SidebarMenuButton>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                        className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-                        align="end"
-                        side={
-                            isMobile
-                                ? 'bottom'
-                                : state === 'collapsed'
-                                  ? 'left'
-                                  : 'bottom'
-                        }
-                    >
-                        <UserMenuContent user={auth.user} />
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </SidebarMenuItem>
-        </SidebarMenu>
+        <div className="flex items-center gap-2 px-3 py-3">
+            <AvatarCircle name={auth.user.name} size={28} />
+            <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-[#1A1917]">{auth.user.name}</p>
+                <p className="truncate text-xs text-[#9B9A96]">{house?.name ?? ''}</p>
+            </div>
+            <Link
+                href="/settings/profile"
+                className="p-1 text-[#9B9A96] transition-colors hover:text-[#1A1917]"
+                title="Configurações"
+            >
+                <Settings size={14} />
+            </Link>
+            <button
+                onClick={handleLogout}
+                className="p-1 text-[#9B9A96] transition-colors hover:text-[#1A1917]"
+                title="Sair"
+            >
+                <LogOut size={14} />
+            </button>
+        </div>
     );
 }

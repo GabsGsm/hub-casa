@@ -8,7 +8,11 @@
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
       "Bash(php artisan:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(grep -E \"^[^/]*pages/[^/]*\\\\.tsx$\")",
+      "Bash(ls -la resources/js/pages/*.tsx)",
+      "Bash(unzip -l \"Hub - Casa-v2.zip\")",
+      "Bash(find 'c:\\\\Users\\\\raku_\\\\Desktop\\\\Vulpi Studio\\\\hub-casa\\\\resources\\\\js\\\\components' -name *error* -o -name *input*)"
     ]
   }
 }

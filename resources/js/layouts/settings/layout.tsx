@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
@@ -10,46 +10,56 @@ import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import type { NavItem } from '@/types';
 
-const sidebarNavItems: NavItem[] = [
+const baseNavItems: NavItem[] = [
     {
-        title: 'Profile',
+        title: 'Perfil',
         href: edit(),
         icon: null,
     },
     {
-        title: 'Security',
+        title: 'Segurança',
         href: editSecurity(),
         icon: null,
     },
     {
-        title: 'Appearance',
+        title: 'Aparência',
         href: editAppearance(),
         icon: null,
     },
 ];
 
+const adminNavItem: NavItem = {
+    title: 'Casa',
+    href: '/settings/casa',
+    icon: null,
+};
+
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
+    const { auth } = usePage().props;
 
     // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {
         return null;
     }
 
+    const isAdmin = auth.user.role === 'admin';
+    const navItems = isAdmin ? [...baseNavItems, adminNavItem] : baseNavItems;
+
     return (
         <div className="px-4 py-6">
             <Heading
-                title="Settings"
-                description="Manage your profile and account settings"
+                title="Configurações"
+                description="Gerencie seu perfil e as configurações da conta"
             />
 
             <div className="flex flex-col lg:flex-row lg:space-x-12">
                 <aside className="w-full max-w-xl lg:w-48">
                     <nav
                         className="flex flex-col space-y-1 space-x-0"
-                        aria-label="Settings"
+                        aria-label="Configurações"
                     >
-                        {sidebarNavItems.map((item, index) => (
+                        {navItems.map((item, index) => (
                             <Button
                                 key={`${toUrl(item.href)}-${index}`}
                                 size="sm"
