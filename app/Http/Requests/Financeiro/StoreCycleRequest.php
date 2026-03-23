@@ -15,7 +15,6 @@ class StoreCycleRequest extends FormRequest
     {
         return [
             'name'            => ['required', 'string', 'max:60'],
-            'day_of_month'    => ['nullable', 'integer', 'min:1', 'max:31'],
             'expected_amount' => ['nullable', 'numeric', 'min:0'],
         ];
     }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\AuthorizesHouseResource;
 use App\Http\Requests\Compras\StoreShoppingItemRequest;
 use App\Http\Requests\Compras\UpdateShoppingItemRequest;
 use App\Models\ShoppingList;
@@ -12,6 +13,7 @@ use Inertia\Response;
 
 class ComprasController extends Controller
 {
+    use AuthorizesHouseResource;
     public function index(Request $request): Response|RedirectResponse
     {
         $house = $request->user()->house;
@@ -65,7 +67,7 @@ class ComprasController extends Controller
 
     public function update(UpdateShoppingItemRequest $request, ShoppingList $item): RedirectResponse
     {
-        $this->ensureCanEdit($request, $item);
+        $this->ensureCanEdit($request->user(), $item);
 
         $item->fill(array_filter($request->validated(), fn ($value) => $value !== null));
         $item->save();
@@ -75,16 +77,10 @@ class ComprasController extends Controller
 
     public function destroy(Request $request, ShoppingList $item): RedirectResponse
     {
-        $this->ensureCanEdit($request, $item);
+        $this->ensureCanEdit($request->user(), $item);
         $item->delete();
 
         return redirect()->route('compras.index')->with('success', 'Item removido.');
     }
 
-    private function ensureCanEdit(Request $request, ShoppingList $item): void
-    {
-        if ($item->house_id !== $request->user()->house_id) {
-            abort(403);
-        }
-    }
 }

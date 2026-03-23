@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\AuthorizesHouseResource;
 use App\Http\Requests\Agenda\StoreAgendaEventRequest;
 use App\Http\Requests\Agenda\UpdateAgendaEventRequest;
 use App\Models\AgendaEvent;
@@ -12,6 +13,7 @@ use Inertia\Response;
 
 class AgendaController extends Controller
 {
+    use AuthorizesHouseResource;
     public function index(Request $request): Response|RedirectResponse
     {
         $house = $request->user()->house;
@@ -58,7 +60,7 @@ class AgendaController extends Controller
 
     public function update(UpdateAgendaEventRequest $request, AgendaEvent $event): RedirectResponse
     {
-        $this->ensureCanEdit($request, $event);
+        $this->ensureCanEdit($request->user(), $event);
 
         $event->fill(array_filter($request->validated(), fn ($value) => $value !== null));
         $event->save();
@@ -68,16 +70,10 @@ class AgendaController extends Controller
 
     public function destroy(Request $request, AgendaEvent $event): RedirectResponse
     {
-        $this->ensureCanEdit($request, $event);
+        $this->ensureCanEdit($request->user(), $event);
         $event->delete();
 
         return redirect()->route('agenda.index')->with('success', 'Compromisso removido.');
     }
 
-    private function ensureCanEdit(Request $request, AgendaEvent $event): void
-    {
-        if ($event->house_id !== $request->user()->house_id) {
-            abort(403);
-        }
-    }
 }

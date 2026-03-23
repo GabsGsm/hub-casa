@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesHouseResource;
 use App\Models\Category;
 use App\Models\FinancialTransaction;
 use App\Models\House;
@@ -9,10 +10,13 @@ use App\Models\PaymentCycle;
 use App\Models\User;
 use App\Repositories\FinancialTransactionRepository;
 use App\Repositories\PaymentCycleRepository;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class FinanceiroService
 {
+    use AuthorizesHouseResource;
+
     public function __construct(
         private readonly PaymentCycleRepository $cycleRepo,
         private readonly FinancialTransactionRepository $transactionRepo,
@@ -20,22 +24,26 @@ class FinanceiroService
 
     /**
      * Monta todos os dados necessários para a página /financeiro.
+     *
+     * @param  int  $month  Mês 1-indexed (1=Janeiro)
      */
-    public function getPageData(House $house): array
+    public function getPageData(House $house, int $year, int $month): array
     {
         $cycles       = $this->cycleRepo->getByHouse($house->id);
-        $transactions = $this->transactionRepo->getByHouse($house->id);
-        $cycleTotals  = $this->cycleRepo->getTransactionsTotalsGrouped($house->id);
+        $transactions = $this->transactionRepo->getResolvedForMonth($house->id, $year, $month);
+        $cycleTotals  = $transactions->groupBy(fn ($t) => $t['cycle']['id'] ?? null);
 
         return [
             'house'        => ['id' => $house->id, 'name' => $house->name],
             'cycles'       => $this->buildCyclesPayload($cycles, $cycleTotals),
-            'transactions' => $this->buildTransactionsPayload($transactions),
+            'transactions' => $transactions->values(),
             'categories'   => Category::query()
                 ->where('house_id', $house->id)
                 ->orderBy('name')
                 ->get(['id', 'name', 'color']),
             'members'      => $house->users()->get(['id', 'name']),
+            'year'         => $year,
+            'month'        => $month,
         ];
     }
 
@@ -52,7 +60,9 @@ class FinanceiroService
      */
     public function updateCycle(House $house, PaymentCycle $cycle, array $data): PaymentCycle
     {
-        $this->assertCycleBelongsToHouse($house->id, $cycle->id);
+        if ($cycle->house_id !== $house->id) {
+            abort(403);
+        }
 
         return $this->cycleRepo->update($cycle, $data);
     }
@@ -62,7 +72,10 @@ class FinanceiroService
      */
     public function deleteCycle(House $house, PaymentCycle $cycle): void
     {
-        $this->assertCycleBelongsToHouse($house->id, $cycle->id);
+        if ($cycle->house_id !== $house->id) {
+            abort(403);
+        }
+
         $this->cycleRepo->delete($cycle);
     }
 
@@ -71,13 +84,12 @@ class FinanceiroService
      */
     public function deleteTransaction(User $user, FinancialTransaction $transaction): void
     {
-        $this->authorize($user, $transaction);
+        $this->ensureCanEdit($user, $transaction);
         $this->transactionRepo->delete($transaction);
     }
 
     /**
      * Cria uma nova transação financeira.
-     * Garante que ciclo e categoria pertencem à mesma casa.
      */
     public function createTransaction(House $house, User $user, array $data): FinancialTransaction
     {
@@ -94,7 +106,6 @@ class FinanceiroService
 
     /**
      * Atualiza uma transação existente.
-     * Verifica autorização e integridade de ciclo/categoria.
      */
     public function updateTransaction(
         House $house,
@@ -102,7 +113,7 @@ class FinanceiroService
         FinancialTransaction $transaction,
         array $data,
     ): FinancialTransaction {
-        $this->authorize($user, $transaction);
+        $this->ensureCanEdit($user, $transaction);
         $this->assertCycleBelongsToHouse($house->id, $data['payment_cycle_id'] ?? null);
         $this->assertCategoryBelongsToHouse($house->id, $data['category_id'] ?? null);
 
@@ -111,27 +122,6 @@ class FinanceiroService
             : null;
 
         return $this->transactionRepo->update($transaction, $data, $assigneeIds);
-    }
-
-    /**
-     * Verifica se o usuário pode editar a transação.
-     * Regras: mesmo house + (admin OU criador OU assignee).
-     */
-    public function authorize(User $user, FinancialTransaction $transaction): void
-    {
-        if ($transaction->house_id !== $user->house_id) {
-            abort(403);
-        }
-
-        if ($user->isAdmin() || $transaction->created_by === $user->id) {
-            return;
-        }
-
-        if ($transaction->assignees()->where('user_id', $user->id)->exists()) {
-            return;
-        }
-
-        abort(403);
     }
 
     // -------------------------------------------------------------------------
@@ -143,54 +133,25 @@ class FinanceiroService
         return $cycles->map(function (PaymentCycle $cycle) use ($cycleTotals) {
             $transactions = $cycleTotals->get($cycle->id, collect());
 
-            $paid = $transactions
+            $paid = collect($transactions)
                 ->where('status', FinancialTransaction::STATUS_PAID)
                 ->where('type', '!=', FinancialTransaction::TYPE_INCOME)
                 ->sum('amount');
 
-            $pending = $transactions
-                ->where('status', '!=', FinancialTransaction::STATUS_PAID)
+            $pending = collect($transactions)
+                ->where('status', FinancialTransaction::STATUS_OPEN)
                 ->where('type', '!=', FinancialTransaction::TYPE_INCOME)
                 ->sum('amount');
 
             return [
                 'id'              => $cycle->id,
                 'name'            => $cycle->name,
-                'day_of_month'    => $cycle->day_of_month,
                 'expected_amount' => (float) $cycle->expected_amount,
                 'paid'            => (float) $paid,
                 'pending'         => (float) $pending,
+                'committed'       => (float) ($paid + $pending),
             ];
         });
-    }
-
-    private function buildTransactionsPayload(Collection $transactions): Collection
-    {
-        return $transactions->map(fn (FinancialTransaction $t) => [
-            'id'                 => $t->id,
-            'title'              => $t->title,
-            'amount'             => (float) $t->amount,
-            'type'               => $t->type,
-            'status'             => $t->status,
-            'created_at'         => $t->created_at->format('Y-m-d'),
-            'due_date'           => optional($t->due_date)->format('Y-m-d'),
-            'recurrence'         => $t->recurrence,
-            'installments_count' => $t->installments_count,
-            'cycle'              => $t->cycle ? [
-                'id'           => $t->cycle->id,
-                'name'         => $t->cycle->name,
-                'day_of_month' => $t->cycle->day_of_month,
-            ] : null,
-            'category'           => $t->category ? [
-                'id'    => $t->category->id,
-                'name'  => $t->category->name,
-                'color' => $t->category->color,
-            ] : null,
-            'assignees'          => $t->assignees->map(fn (User $user) => [
-                'id' => $user->id,
-                'name' => $user->name,
-            ]),
-        ]);
     }
 
     private function assertCycleBelongsToHouse(int $houseId, mixed $cycleId): void

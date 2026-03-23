@@ -15,15 +15,12 @@ class PaymentCycle extends Model
         'house_id',
         'user_id',
         'name',
-        'day_of_month',
         'expected_amount',
-        'recurring',
         'active',
     ];
 
     protected $casts = [
-        'recurring' => 'boolean',
-        'active' => 'boolean',
+        'active'          => 'boolean',
         'expected_amount' => 'decimal:2',
     ];
 

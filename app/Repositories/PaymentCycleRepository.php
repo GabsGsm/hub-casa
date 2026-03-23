@@ -9,25 +9,25 @@ use Illuminate\Support\Collection;
 class PaymentCycleRepository
 {
     /**
-     * Retorna todos os ciclos de uma casa, ordenados por dia do mês.
+     * Retorna todos os ciclos de uma casa, ordenados por nome.
      */
     public function getByHouse(int $houseId): Collection
     {
         return PaymentCycle::query()
             ->where('house_id', $houseId)
-            ->orderByRaw('day_of_month is null')
-            ->orderBy('day_of_month')
+            ->orderBy('name')
             ->get();
     }
 
     /**
      * Retorna as transações da casa agrupadas por payment_cycle_id,
-     * usado para calcular os totais pago/pendente de cada ciclo.
+     * excluindo impossibilitados do cálculo de totais.
      */
     public function getTransactionsTotalsGrouped(int $houseId): Collection
     {
         return FinancialTransaction::query()
             ->where('house_id', $houseId)
+            ->where('status', '!=', FinancialTransaction::STATUS_IMPOSSIBLE)
             ->get()
             ->groupBy('payment_cycle_id');
     }
@@ -41,9 +41,7 @@ class PaymentCycleRepository
             'house_id'        => $houseId,
             'user_id'         => $userId,
             'name'            => $data['name'],
-            'day_of_month'    => $data['day_of_month'] ?? null,
             'expected_amount' => $data['expected_amount'] ?? 0,
-            'recurring'       => true,
             'active'          => true,
         ]);
     }
@@ -53,7 +51,8 @@ class PaymentCycleRepository
      */
     public function update(PaymentCycle $cycle, array $data): PaymentCycle
     {
-        $cycle->fill(array_filter($data, fn ($v) => $v !== null));
+        $allowed = ['name', 'expected_amount', 'active'];
+        $cycle->fill(array_intersect_key($data, array_flip($allowed)));
         $cycle->save();
 
         return $cycle;

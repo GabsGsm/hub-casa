@@ -15,8 +15,8 @@ class UpdateCycleRequest extends FormRequest
     {
         return [
             'name'            => ['nullable', 'string', 'max:60'],
-            'day_of_month'    => ['nullable', 'integer', 'min:1', 'max:31'],
             'expected_amount' => ['nullable', 'numeric', 'min:0'],
+            'active'          => ['nullable', 'boolean'],
         ];
     }
 }

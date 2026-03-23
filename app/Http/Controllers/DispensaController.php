@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\AuthorizesHouseResource;
 use App\Http\Requests\Dispensa\StorePantryItemRequest;
 use App\Http\Requests\Dispensa\UpdatePantryItemRequest;
 use App\Models\PantryItem;
@@ -12,6 +13,7 @@ use Inertia\Response;
 
 class DispensaController extends Controller
 {
+    use AuthorizesHouseResource;
     public function index(Request $request): Response|RedirectResponse
     {
         $house = $request->user()->house;
@@ -61,7 +63,7 @@ class DispensaController extends Controller
 
     public function update(UpdatePantryItemRequest $request, PantryItem $item): RedirectResponse
     {
-        $this->ensureCanEdit($request, $item);
+        $this->ensureCanEdit($request->user(), $item);
 
         $item->fill(array_filter($request->validated(), fn ($value) => $value !== null));
         $item->save();
@@ -71,16 +73,10 @@ class DispensaController extends Controller
 
     public function destroy(Request $request, PantryItem $item): RedirectResponse
     {
-        $this->ensureCanEdit($request, $item);
+        $this->ensureCanEdit($request->user(), $item);
         $item->delete();
 
         return redirect()->route('dispensa.index')->with('success', 'Item removido.');
     }
 
-    private function ensureCanEdit(Request $request, PantryItem $item): void
-    {
-        if ($item->house_id !== $request->user()->house_id) {
-            abort(403);
-        }
-    }
 }
