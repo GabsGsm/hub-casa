@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FinancialTransaction extends Model
 {
@@ -33,6 +32,7 @@ class FinancialTransaction extends Model
         'is_recurring',
         'recurrence_day',
         'installments_total',
+        'installment_current',
         'installment_amount',
         'notes',
     ];
@@ -40,9 +40,10 @@ class FinancialTransaction extends Model
     protected $casts = [
         'amount'             => 'decimal:2',
         'due_date'           => 'date',
-        'is_recurring'       => 'boolean',
-        'installments_total' => 'integer',
-        'installment_amount' => 'decimal:2',
+        'is_recurring'        => 'boolean',
+        'installments_total'  => 'integer',
+        'installment_current' => 'integer',
+        'installment_amount'  => 'decimal:2',
     ];
 
     public function house(): BelongsTo
@@ -68,11 +69,6 @@ class FinancialTransaction extends Model
     public function assignees(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'financial_transaction_user');
-    }
-
-    public function payments(): HasMany
-    {
-        return $this->hasMany(TransactionPayment::class, 'transaction_id');
     }
 
     public function isExpense(): bool

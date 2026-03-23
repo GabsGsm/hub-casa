@@ -1,5 +1,5 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { Bell, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { AvatarStack } from '@/components/hub/avatar-stack';
 import { ProgressBar } from '@/components/hub/progress-bar';
 import { RingChart } from '@/components/hub/ring-chart';
@@ -34,9 +34,6 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                         <p className="mt-1 font-mono text-sm capitalize text-[#9B9A96]">{todayLabel}</p>
                     </div>
                     <div className="hidden items-center gap-1 md:flex">
-                        <button className="flex size-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]">
-                            <Bell size={16} className="text-[#9B9A96]" />
-                        </button>
                         <Link
                             href="/settings/profile"
                             className="flex size-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]"

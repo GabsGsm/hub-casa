@@ -73,7 +73,14 @@ class DashboardController extends Controller
             ]);
         }
 
-        $activeCycle = $cyclesPayload->first();
+        // Prioridade: (1) ciclo com maior pending no mês → ainda em aberto
+        //             (2) ciclo com maior committed → mais movimento, mesmo que quitado
+        //             (3) primeiro da lista (fallback)
+        $activeCycle = $cyclesPayload
+            ->filter(fn ($c) => $c['id'] !== 0) // exclui "Sem ciclo"
+            ->sortByDesc(fn ($c) => $c['pending'] * 10000 + $c['committed'])
+            ->first()
+            ?? $cyclesPayload->first();
 
         // "A Pagar": despesas do mês não pagas e não impossibilitadas
         $dueToday = $resolvedTx->filter(

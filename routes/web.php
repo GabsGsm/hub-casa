@@ -44,6 +44,8 @@ Route::middleware('auth')->group(function () {
             });
 
             Route::prefix('lancamentos')->name('lancamentos.')->group(function () {
+                Route::get('/todos', [FinanceiroController::class, 'allTransactions'])
+                    ->name('all');
                 Route::post('/', [FinanceiroController::class, 'storeTransaction'])
                     ->name('store');
                 Route::put('/{transaction}', [FinanceiroController::class, 'updateTransaction'])

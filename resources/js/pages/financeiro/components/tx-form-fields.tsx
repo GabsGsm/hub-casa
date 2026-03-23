@@ -33,16 +33,17 @@ export function TxFormFields({
     assigneeIds,
     onAssigneesChange,
 }: TxFormFieldsProps) {
-    const isDivida = data.type === 'divida';
-
-    const dueDayOfMonth = data.due_date
-        ? new Date(data.due_date + 'T00:00').getDate()
-        : null;
+    const isDivida    = data.type === 'divida';
+    const isRecurring = data.is_recurring === '1';
 
     function handleTypeChange(v: string) {
         setData('type', v);
-        if (v === 'divida') setData('recurrence', '');
-        else setData('installments_count', '');
+        if (v === 'divida') {
+            setData('is_recurring', '0');
+            setData('installments_total', data.installments_total || '');
+        } else {
+            setData('installments_total', '');
+        }
     }
 
     return (
@@ -116,11 +117,12 @@ export function TxFormFields({
                     <Input
                         type="number"
                         min={1}
-                        value={data.installments_count}
-                        onChange={(e) => setData('installments_count', e.target.value)}
+                        value={data.installments_total}
+                        onChange={(e) => setData('installments_total', e.target.value)}
                         required
                         placeholder="Ex: 12"
                     />
+                    <InputError message={errors?.installments_total} />
                     <p className="text-xs text-[#9B9A96]">
                         Parcelas seguintes são projetadas automaticamente no Histórico
                     </p>
@@ -128,27 +130,33 @@ export function TxFormFields({
             ) : (
                 <div className="grid gap-2">
                     <Label>Recorrência</Label>
-                    <Select
-                        value={valOrNone(data.recurrence)}
-                        onValueChange={(v) => setData('recurrence', noneOrVal(v))}
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__none__">Não recorrente</SelectItem>
-                            <SelectItem value="mensal">Mensal</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    {data.recurrence === 'mensal' && dueDayOfMonth && (
-                        <p className="text-xs text-[#2563EB]">
-                            Projetado todo dia {dueDayOfMonth} de cada mês
-                        </p>
-                    )}
-                    {data.recurrence === 'mensal' && !data.due_date && (
-                        <p className="text-xs text-[#9B9A96]">
-                            Defina o vencimento para fixar o dia da recorrência
-                        </p>
+                    <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                            type="checkbox"
+                            checked={isRecurring}
+                            onChange={(e) => setData('is_recurring', e.target.checked ? '1' : '0')}
+                            className="h-4 w-4 rounded border-[#E5E4E2] accent-[#1A1917]"
+                        />
+                        <span className="text-sm text-[#1A1917]">Lançamento recorrente (mensal)</span>
+                    </label>
+                    {isRecurring && (
+                        <div className="grid gap-1">
+                            <Label>Dia de recorrência</Label>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={31}
+                                value={data.recurrence_day}
+                                onChange={(e) => setData('recurrence_day', e.target.value)}
+                                placeholder="Ex: 15"
+                            />
+                            <InputError message={errors?.recurrence_day} />
+                            {data.recurrence_day && (
+                                <p className="text-xs text-[#2563EB]">
+                                    Projetado todo dia {data.recurrence_day} de cada mês
+                                </p>
+                            )}
+                        </div>
                     )}
                 </div>
             )}
@@ -204,6 +212,17 @@ export function TxFormFields({
                     />
                 </div>
             )}
+
+            <div className="grid gap-2">
+                <Label>Observações</Label>
+                <textarea
+                    className="min-h-15 w-full rounded-md border border-[#E5E4E2] bg-white px-3 py-2 text-sm text-[#1A1917] placeholder:text-[#9B9A96] focus:outline-none focus:ring-1 focus:ring-[#1A1917]"
+                    value={data.notes}
+                    onChange={(e) => setData('notes', e.target.value)}
+                    rows={2}
+                    placeholder="Opcional"
+                />
+            </div>
         </>
     );
 }

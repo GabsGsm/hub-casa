@@ -9,7 +9,6 @@ use App\Http\Requests\Financeiro\UpdateCycleRequest;
 use App\Http\Requests\Financeiro\UpdateTransactionRequest;
 use App\Models\FinancialTransaction;
 use App\Models\PaymentCycle;
-use App\Models\TransactionPayment;
 use App\Repositories\FinancialTransactionRepository;
 use App\Services\FinanceiroService;
 use Carbon\Carbon;
@@ -141,26 +140,4 @@ class FinanceiroController extends Controller
         return redirect()->route('financeiro.index')->with('success', 'Lançamento removido.');
     }
 
-    public function storePayment(Request $request, FinancialTransaction $transaction): RedirectResponse
-    {
-        $this->ensureCanEdit($request->user(), $transaction);
-
-        $validated = $request->validate([
-            'amount'             => ['required', 'numeric', 'min:0.01'],
-            'paid_at'            => ['required', 'date'],
-            'installment_number' => ['nullable', 'integer', 'min:1'],
-            'notes'              => ['nullable', 'string', 'max:255'],
-        ]);
-
-        TransactionPayment::create([
-            'transaction_id'     => $transaction->id,
-            'paid_by'            => $request->user()->id,
-            'amount'             => $validated['amount'],
-            'paid_at'            => $validated['paid_at'],
-            'installment_number' => $validated['installment_number'] ?? null,
-            'notes'              => $validated['notes'] ?? null,
-        ]);
-
-        return redirect()->route('financeiro.index')->with('success', 'Pagamento registrado.');
-    }
 }

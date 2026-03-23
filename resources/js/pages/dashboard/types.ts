@@ -7,6 +7,7 @@ export type DashboardProps = {
             expected_amount: number;
             paid: number;
             pending: number;
+            committed: number;
         } | null;
         payable: { amount: number; count: number };
         tasks: { done: number; total: number };
@@ -15,10 +16,10 @@ export type DashboardProps = {
     cycles: {
         id: number;
         name: string;
-        day_of_month: number | null;
         expected_amount: number;
         paid: number;
         pending: number;
+        committed: number;
     }[];
     transactions: {
         id: number;

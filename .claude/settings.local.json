@@ -12,7 +12,8 @@
       "Bash(grep -E \"^[^/]*pages/[^/]*\\\\.tsx$\")",
       "Bash(ls -la resources/js/pages/*.tsx)",
       "Bash(unzip -l \"Hub - Casa-v2.zip\")",
-      "Bash(find 'c:\\\\Users\\\\raku_\\\\Desktop\\\\Vulpi Studio\\\\hub-casa\\\\resources\\\\js\\\\components' -name *error* -o -name *input*)"
+      "Bash(find 'c:\\\\Users\\\\raku_\\\\Desktop\\\\Vulpi Studio\\\\hub-casa\\\\resources\\\\js\\\\components' -name *error* -o -name *input*)",
+      "Bash(grep -r export.*register 'c:/Users/raku_/Desktop/Vulpi Studio/hub-casa/resources/js/routes')"
     ]
   }
 }

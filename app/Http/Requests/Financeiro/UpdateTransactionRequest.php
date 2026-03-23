@@ -36,7 +36,7 @@ class UpdateTransactionRequest extends FormRequest
             'assignee_ids.*'     => ['integer', 'exists:users,id'],
             'is_recurring'       => ['nullable', 'boolean'],
             'recurrence_day'     => ['nullable', 'integer', 'min:1', 'max:31'],
-            'installments_total' => ['nullable', 'integer', 'min:1', 'max:360'],
+            'installments_total' => ['nullable', 'integer', 'min:1', 'max:420'],
             'installment_amount' => ['nullable', 'numeric', 'min:0'],
             'notes'              => ['nullable', 'string', 'max:500'],
         ];

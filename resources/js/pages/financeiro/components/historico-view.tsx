@@ -1,8 +1,8 @@
+import { router } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useMemo, useState } from 'react';
 import { StatusPill } from '@/components/hub/status-pill';
-import { currency, MONTH_NAMES_FULL, resolveTransactionsForMonth } from '../utils';
-import type { Cycle, ResolvedTransaction, Transaction } from '../types';
+import { currency, MONTH_NAMES_FULL } from '../utils';
+import type { Cycle, ResolvedTransaction } from '../types';
 
 // ── Section header ──────────────────────────────────────────────────────────
 function SectionHeader({ title, count, color }: { title: string; count: number; color: string }) {
@@ -18,9 +18,9 @@ function SectionHeader({ title, count, color }: { title: string; count: number; 
 
 // ── Row item ─────────────────────────────────────────────────────────────────
 function HistoricoRow({ t, isFuture }: { t: ResolvedTransaction; isFuture: boolean }) {
-    const dueDay = t.resolvedDate ? new Date(t.resolvedDate + 'T00:00').getDate() : null;
-    const isParcelamento = !!t.installmentNum;
-    const isRecorrente = t.recurrence === 'mensal';
+    const dueDay        = t.resolved_date ? new Date(t.resolved_date + 'T00:00').getDate() : null;
+    const isParcelamento = !!t.installment_num;
+    const isRecorrente  = t.is_recurring;
 
     return (
         <div className="flex items-center gap-4 px-5 py-3 transition-colors hover:bg-[#F8F8F7]">
@@ -35,7 +35,7 @@ function HistoricoRow({ t, isFuture }: { t: ResolvedTransaction; isFuture: boole
                     )}
                     {isParcelamento && (
                         <span className="font-mono text-xs text-[#9B9A96]">
-                            {t.installmentNum} de {t.installmentsTotal} parcelas
+                            {t.installment_num} de {t.installments_total} parcelas
                         </span>
                     )}
                 </div>
@@ -55,12 +55,12 @@ function HistoricoRow({ t, isFuture }: { t: ResolvedTransaction; isFuture: boole
                         <div
                             className="h-full rounded-full bg-[#2563EB]"
                             style={{
-                                width: `${((t.installmentNum ?? 0) / (t.installmentsTotal ?? 1)) * 100}%`,
+                                width: `${((t.installment_num ?? 0) / (t.installments_total ?? 1)) * 100}%`,
                             }}
                         />
                     </div>
                     <span className="font-mono text-xs text-[#9B9A96]">
-                        {t.installmentNum}/{t.installmentsTotal}
+                        {t.installment_num}/{t.installments_total}
                     </span>
                 </div>
             )}
@@ -87,33 +87,52 @@ function HistoricoRow({ t, isFuture }: { t: ResolvedTransaction; isFuture: boole
 // ── Main component ────────────────────────────────────────────────────────────
 type HistoricoViewProps = {
     cycles: Cycle[];
-    transactions: Transaction[];
+    transactions: ResolvedTransaction[];
+    year: number;
+    month: number; // 1-indexed
 };
 
-export function HistoricoView({ cycles, transactions }: HistoricoViewProps) {
-    const [offset, setOffset] = useState(0);
+export function HistoricoView({ cycles, transactions, year, month }: HistoricoViewProps) {
+    const isFuture = (() => {
+        const now = new Date();
+        return year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1);
+    })();
 
-    const { year, month } = useMemo(() => {
-        const today = new Date();
-        const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
-        return { year: d.getFullYear(), month: d.getMonth() };
-    }, [offset]);
+    function navigate(delta: number) {
+        let m = month + delta;
+        let y = year;
+        if (m < 1)  { m = 12; y -= 1; }
+        if (m > 12) { m = 1;  y += 1; }
+        router.visit(`/financeiro?year=${y}&month=${m}`, {
+            only: ['transactions', 'year', 'month'],
+            preserveScroll: true,
+        });
+    }
 
-    const resolved = useMemo(
-        () => resolveTransactionsForMonth(transactions, year, month),
-        [transactions, year, month],
-    );
+    function goToCurrentMonth() {
+        const now = new Date();
+        router.visit(`/financeiro?year=${now.getFullYear()}&month=${now.getMonth() + 1}`, {
+            only: ['transactions', 'year', 'month'],
+            preserveScroll: true,
+        });
+    }
 
-    const recorrentes = resolved.filter((t) => t.recurrence === 'mensal' && t.type !== 'ganho');
-    const parcelamentos = resolved.filter((t) => t.type === 'divida');
-    const outros = resolved.filter((t) => !t.recurrence && t.type === 'gasto');
-    const receitas = resolved.filter((t) => t.type === 'ganho');
+    const recorrentes   = transactions.filter((t) => t.is_recurring && t.type !== 'ganho');
+    const parcelamentos = transactions.filter((t) => t.type === 'divida');
+    const outros        = transactions.filter((t) => !t.is_recurring && t.type === 'gasto');
+    const receitas      = transactions.filter((t) => t.type === 'ganho');
 
-    const totalCiclos = cycles.reduce((s, c) => s + c.expected_amount, 0);
+    const totalCiclos   = cycles.reduce((s, c) => s + c.expected_amount, 0);
     const totalReceitas = totalCiclos + receitas.reduce((s, t) => s + t.amount, 0);
-    const totalDespesas = [...recorrentes, ...parcelamentos, ...outros].reduce((s, t) => s + t.amount, 0);
+    const totalDespesas = [...recorrentes, ...parcelamentos, ...outros]
+        .filter((t) => t.status !== 'impossibilitado')
+        .reduce((s, t) => s + t.amount, 0);
     const saldo = totalReceitas - totalDespesas;
-    const isFuture = offset > 0;
+
+    const isCurrentMonth = (() => {
+        const now = new Date();
+        return year === now.getFullYear() && month === now.getMonth() + 1;
+    })();
 
     return (
         <div>
@@ -122,27 +141,27 @@ export function HistoricoView({ cycles, transactions }: HistoricoViewProps) {
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
-                        onClick={() => setOffset((o) => o - 1)}
+                        onClick={() => navigate(-1)}
                         className="flex h-8 w-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]"
                     >
                         <ChevronLeft size={16} className="text-[#6B6A67]" />
                     </button>
                     <span className="w-44 text-center text-[16px] font-medium text-[#1A1917]">
-                        {MONTH_NAMES_FULL[month]} {year}
+                        {MONTH_NAMES_FULL[month - 1]} {year}
                     </span>
                     <button
                         type="button"
-                        onClick={() => setOffset((o) => o + 1)}
+                        onClick={() => navigate(1)}
                         className="flex h-8 w-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]"
                     >
                         <ChevronRight size={16} className="text-[#6B6A67]" />
                     </button>
                 </div>
                 <div className="flex items-center gap-3">
-                    {offset !== 0 && (
+                    {!isCurrentMonth && (
                         <button
                             type="button"
-                            onClick={() => setOffset(0)}
+                            onClick={goToCurrentMonth}
                             className="text-sm text-[#9B9A96] transition-colors hover:text-[#1A1917]"
                         >
                             Mês atual
@@ -187,7 +206,7 @@ export function HistoricoView({ cycles, transactions }: HistoricoViewProps) {
                     ) : (
                         <div className="divide-y divide-[#E4E3E0]">
                             {recorrentes.map((t) => (
-                                <HistoricoRow key={`${t.id}-${t.installmentNum ?? 0}`} t={t} isFuture={isFuture} />
+                                <HistoricoRow key={`${t.id}-${t.installment_num ?? 0}`} t={t} isFuture={isFuture} />
                             ))}
                         </div>
                     )}
@@ -201,7 +220,7 @@ export function HistoricoView({ cycles, transactions }: HistoricoViewProps) {
                     <div className="overflow-hidden rounded-[12px] border border-[#E4E3E0] bg-white">
                         <div className="divide-y divide-[#E4E3E0]">
                             {parcelamentos.map((t) => (
-                                <HistoricoRow key={`${t.id}-${t.installmentNum ?? 0}`} t={t} isFuture={isFuture} />
+                                <HistoricoRow key={`${t.id}-${t.installment_num ?? 0}`} t={t} isFuture={isFuture} />
                             ))}
                         </div>
                     </div>
