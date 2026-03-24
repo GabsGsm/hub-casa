@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, HelpCircle, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import InputError from '@/components/input-error';
 import { ConfirmDialog } from '@/components/hub/confirm-dialog';
@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { CycleCard } from './components/cycle-card';
 import { TxDrawer } from './components/tx-drawer';
@@ -202,6 +203,15 @@ export default function Financeiro({
     function markAsPaid(id: number) {
         router.put(`/financeiro/lancamentos/${id}`, { status: 'pago' }, { preserveScroll: true });
     }
+    // ── Tooltip descriptions ──────────────────────────────────────────────────
+    const TX_FILTER_TOOLTIPS: Record<string, string> = {
+        todos:      'Exibe todos os lançamentos do mês',
+        pago:       'Apenas lançamentos já pagos',
+        pendente:   'Apenas lançamentos ainda em aberto',
+        recorrente: 'Lançamentos que se repetem automaticamente todo mês',
+        divida:     'Lançamentos do tipo dívida',
+    };
+
     // ── Render ────────────────────────────────────────────────────────────────
     const noCycle     = cycleMthTotals[0];
     const showNoCycle = noCycle && (noCycle.paid > 0 || noCycle.pending > 0);
@@ -222,42 +232,62 @@ export default function Financeiro({
 
                     <div className="flex items-center gap-3">
                         {isFuture && (
-                            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs text-[#D97706]">
-                                Projeção futura
-                            </span>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs text-[#D97706]">
+                                        Projeção futura
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Os valores exibidos são projeções baseadas em lançamentos recorrentes.</TooltipContent>
+                            </Tooltip>
                         )}
 
                         <div className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                onClick={() => navigate(-1)}
-                                className="flex h-8 w-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]"
-                            >
-                                <ChevronLeft size={16} className="text-[#6B6A67]" />
-                            </button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(-1)}
+                                        className="flex h-8 w-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]"
+                                    >
+                                        <ChevronLeft size={16} className="text-[#6B6A67]" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Mês anterior</TooltipContent>
+                            </Tooltip>
                             <span className="w-40 text-center text-sm font-medium text-[#1A1917]">
                                 {MONTH_NAMES_FULL[month - 1]} {year}
                             </span>
-                            <button
-                                type="button"
-                                onClick={() => navigate(1)}
-                                className="flex h-8 w-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]"
-                            >
-                                <ChevronRight size={16} className="text-[#6B6A67]" />
-                            </button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(1)}
+                                        className="flex h-8 w-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]"
+                                    >
+                                        <ChevronRight size={16} className="text-[#6B6A67]" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Próximo mês</TooltipContent>
+                            </Tooltip>
                         </div>
 
                         {!isCurrentMonth && (
-                            <button
-                                type="button"
-                                onClick={() => router.visit(`/financeiro?year=${now.getFullYear()}&month=${now.getMonth() + 1}`, {
-                                    only: ['transactions', 'year', 'month'],
-                                    preserveState: true,
-                                })}
-                                className="text-sm text-[#9B9A96] transition-colors hover:text-[#1A1917]"
-                            >
-                                Mês atual
-                            </button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.visit(`/financeiro?year=${now.getFullYear()}&month=${now.getMonth() + 1}`, {
+                                            only: ['transactions', 'year', 'month'],
+                                            preserveState: true,
+                                        })}
+                                        className="text-sm text-[#9B9A96] transition-colors hover:text-[#1A1917]"
+                                    >
+                                        Mês atual
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Voltar para o mês atual</TooltipContent>
+                            </Tooltip>
                         )}
                     </div>
                 </div>
@@ -265,15 +295,30 @@ export default function Financeiro({
                 {/* ── Cards de ciclo ── */}
                 <div>
                     <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-[16px] font-medium text-[#1A1917]">Ciclos de Pagamento</h3>
-                        <button
-                            type="button"
-                            onClick={() => setCycleDialogOpen(true)}
-                            className="flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
-                        >
-                            <Plus size={14} />
-                            Novo ciclo
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                            <h3 className="text-[16px] font-medium text-[#1A1917]">Ciclos de Pagamento</h3>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="cursor-help">
+                                        <HelpCircle size={13} className="text-[#C8C7C3]" />
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Grupos de despesas recorrentes (ex: aluguel, serviços). Ajudam a organizar onde cada gasto se encaixa.</TooltipContent>
+                            </Tooltip>
+                        </div>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => setCycleDialogOpen(true)}
+                                    className="flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
+                                >
+                                    <Plus size={14} />
+                                    Novo ciclo
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Criar um novo ciclo de pagamento para agrupar despesas</TooltipContent>
+                        </Tooltip>
                     </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         {cycles.map((cycle) => {
@@ -343,30 +388,49 @@ export default function Financeiro({
                 {/* ── Lançamentos ── */}
                 <div>
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="text-[16px] font-medium text-[#1A1917]">Lançamentos</h3>
+                        <div className="flex items-center gap-1.5">
+                            <h3 className="text-[16px] font-medium text-[#1A1917]">Lançamentos</h3>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="cursor-help">
+                                        <HelpCircle size={13} className="text-[#C8C7C3]" />
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Registros de receitas, gastos e dívidas do mês. Clique em uma linha para editar.</TooltipContent>
+                            </Tooltip>
+                        </div>
                         <div className="flex flex-wrap items-center gap-2">
                             {TX_FILTERS.map(({ key, label }) => (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    onClick={() => setTxFilter(key)}
-                                    className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-                                        txFilter === key
-                                            ? 'border-[#1A1917] bg-[#1A1917] text-white'
-                                            : 'border-[#C8C7C3] bg-white text-[#6B6A67] hover:border-[#9B9A96]'
-                                    }`}
-                                >
-                                    {label}
-                                </button>
+                                <Tooltip key={key}>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTxFilter(key)}
+                                            className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                                                txFilter === key
+                                                    ? 'border-[#1A1917] bg-[#1A1917] text-white'
+                                                    : 'border-[#C8C7C3] bg-white text-[#6B6A67] hover:border-[#9B9A96]'
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{TX_FILTER_TOOLTIPS[key]}</TooltipContent>
+                                </Tooltip>
                             ))}
-                            <button
-                                type="button"
-                                onClick={openCreateTx}
-                                className="flex h-9 items-center gap-1.5 rounded-[8px] bg-[#1A1917] px-4 text-sm text-white transition-colors hover:bg-[#3D3C3A]"
-                            >
-                                <Plus size={14} />
-                                Novo lançamento
-                            </button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        onClick={openCreateTx}
+                                        className="flex h-9 items-center gap-1.5 rounded-[8px] bg-[#1A1917] px-4 text-sm text-white transition-colors hover:bg-[#3D3C3A]"
+                                    >
+                                        <Plus size={14} />
+                                        Novo lançamento
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Registrar uma nova receita, despesa ou dívida</TooltipContent>
+                            </Tooltip>
                         </div>
                     </div>
 

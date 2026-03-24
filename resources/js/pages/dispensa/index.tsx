@@ -1,11 +1,12 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, HelpCircle, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import InputError from '@/components/input-error';
 import { ConfirmDialog } from '@/components/hub/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     Select,
     SelectContent,
@@ -139,6 +140,11 @@ export default function Dispensa({ items }: DispensaProps) {
         })),
     ];
 
+    const filterChipTooltips: Record<string, string> = {
+        todos: 'Exibe todos os itens da dispensa',
+        baixo: 'Itens com quantidade atual abaixo do mínimo definido — precisam ser repostos',
+    };
+
     return (
         <AppLayout breadcrumbs={[
             { title: 'Dashboard', href: '/dashboard' },
@@ -150,13 +156,28 @@ export default function Dispensa({ items }: DispensaProps) {
                 {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-[28px] font-semibold leading-tight text-[#1A1917]">Dispensa</h1>
+                        <div className="flex items-center gap-1.5">
+                            <h1 className="text-[28px] font-semibold leading-tight text-[#1A1917]">Dispensa</h1>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="mt-1 cursor-help">
+                                        <HelpCircle size={14} className="text-[#C8C7C3]" />
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Controle o estoque da casa. Defina quantidades mínimas para ser alertado quando um item estiver acabando.</TooltipContent>
+                            </Tooltip>
+                        </div>
                         <p className="text-sm text-[#9B9A96]">Controle de estoque da casa.</p>
                     </div>
-                    <Button onClick={() => setCreateOpen(true)} className="gap-2">
-                        <Plus size={14} />
-                        Novo item
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+                                <Plus size={14} />
+                                Novo item
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Adicionar um novo item ao controle da dispensa</TooltipContent>
+                    </Tooltip>
                 </div>
 
                 {/* Alert banner */}
@@ -175,26 +196,30 @@ export default function Dispensa({ items }: DispensaProps) {
                 {/* Filter chips */}
                 <div className="flex flex-wrap items-center gap-2">
                     {filterChips.map(({ key, label, count }) => (
-                        <button
-                            key={key}
-                            type="button"
-                            onClick={() => setCategoryFilter(key)}
-                            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                                categoryFilter === key
-                                    ? 'bg-[#1A1917] text-white'
-                                    : key === 'baixo' && count > 0
-                                    ? 'bg-[#FEF2F2] text-[#DC2626] hover:bg-[#FCA5A5]/20'
-                                    : 'bg-[#F0EFED] text-[#6B6A67] hover:bg-[#E4E3E0]'
-                            }`}
-                        >
-                            {key === 'baixo' && count > 0 && <AlertTriangle size={10} />}
-                            {label}
-                            <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
-                                categoryFilter === key ? 'bg-white/20' : 'bg-white text-[#9B9A96]'
-                            }`}>
-                                {count}
-                            </span>
-                        </button>
+                        <Tooltip key={key}>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => setCategoryFilter(key)}
+                                    className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                                        categoryFilter === key
+                                            ? 'bg-[#1A1917] text-white'
+                                            : key === 'baixo' && count > 0
+                                            ? 'bg-[#FEF2F2] text-[#DC2626] hover:bg-[#FCA5A5]/20'
+                                            : 'bg-[#F0EFED] text-[#6B6A67] hover:bg-[#E4E3E0]'
+                                    }`}
+                                >
+                                    {key === 'baixo' && count > 0 && <AlertTriangle size={10} />}
+                                    {label}
+                                    <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
+                                        categoryFilter === key ? 'bg-white/20' : 'bg-white text-[#9B9A96]'
+                                    }`}>
+                                        {count}
+                                    </span>
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent>{filterChipTooltips[key] ?? `Filtrar por categoria: ${label}`}</TooltipContent>
+                        </Tooltip>
                     ))}
                 </div>
 

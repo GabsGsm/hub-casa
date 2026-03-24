@@ -11,10 +11,12 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Head, router, useForm } from '@inertiajs/react';
+import { HelpCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/hub/confirm-dialog';
 import { TaskCard } from '@/components/hub/task-card';
 import { TaskColumn } from '@/components/hub/task-column';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { InlineAdd } from './components/inline-add';
 import { TaskEditSheet } from './components/task-edit-sheet';
@@ -227,33 +229,58 @@ export default function Tarefas({ tasks: initialTasks, members }: TarefasProps) 
                 {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <div className="text-[28px] font-semibold leading-tight text-[#1A1917]">Tarefas</div>
+                        <div className="flex items-center gap-1.5">
+                            <div className="text-[28px] font-semibold leading-tight text-[#1A1917]">Tarefas</div>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="mt-1 cursor-help">
+                                        <HelpCircle size={14} className="text-[#C8C7C3]" />
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Organize as tarefas da casa por dia da semana. Arraste e solte para reorganizar ou mudar de dia.</TooltipContent>
+                            </Tooltip>
+                        </div>
                         <div className="font-mono text-sm text-[#9B9A96]">{weekLabel}</div>
                     </div>
                     <div className="flex items-center gap-1">
-                        <button
-                            type="button"
-                            onClick={() => setWeekOffset((w) => w - 1)}
-                            className="flex items-center gap-1 rounded-[6px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
-                        >
-                            ← Anterior
-                        </button>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => setWeekOffset((w) => w - 1)}
+                                    className="flex items-center gap-1 rounded-[6px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
+                                >
+                                    ← Anterior
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Semana anterior</TooltipContent>
+                        </Tooltip>
                         {weekOffset !== 0 && (
-                            <button
-                                type="button"
-                                onClick={() => setWeekOffset(0)}
-                                className="rounded-[6px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
-                            >
-                                Hoje
-                            </button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        onClick={() => setWeekOffset(0)}
+                                        className="rounded-[6px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
+                                    >
+                                        Hoje
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Voltar para a semana atual</TooltipContent>
+                            </Tooltip>
                         )}
-                        <button
-                            type="button"
-                            onClick={() => setWeekOffset((w) => w + 1)}
-                            className="flex items-center gap-1 rounded-[6px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
-                        >
-                            Próxima →
-                        </button>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => setWeekOffset((w) => w + 1)}
+                                    className="flex items-center gap-1 rounded-[6px] px-3 py-1.5 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
+                                >
+                                    Próxima →
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Próxima semana</TooltipContent>
+                        </Tooltip>
                     </div>
                 </div>
 

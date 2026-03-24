@@ -4,6 +4,7 @@ import { AvatarStack } from '@/components/hub/avatar-stack';
 import { ProgressBar } from '@/components/hub/progress-bar';
 import { RingChart } from '@/components/hub/ring-chart';
 import { StatCard } from '@/components/hub/stat-card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
@@ -34,12 +35,17 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                         <p className="mt-1 font-mono text-sm capitalize text-[#9B9A96]">{todayLabel}</p>
                     </div>
                     <div className="hidden items-center gap-1 md:flex">
-                        <Link
-                            href="/settings/profile"
-                            className="flex size-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]"
-                        >
-                            <Settings size={16} className="text-[#9B9A96]" />
-                        </Link>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Link
+                                    href="/settings/profile"
+                                    className="flex size-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[#F0EFED]"
+                                >
+                                    <Settings size={16} className="text-[#9B9A96]" />
+                                </Link>
+                            </TooltipTrigger>
+                            <TooltipContent>Configurações</TooltipContent>
+                        </Tooltip>
                     </div>
                 </div>
 
@@ -48,6 +54,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                     <StatCard
                         label="Ciclo Ativo"
                         accent="#2563EB"
+                        tooltip="Resumo do ciclo de pagamento ativo. Mostra o total esperado, o valor já pago e o que ainda está pendente."
                         value={stats.activeCycle ? `R$ ${fmt(stats.activeCycle.expected_amount)}` : 'Sem ciclo'}
                         caption={
                             stats.activeCycle
@@ -62,6 +69,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
 
                     <StatCard
                         label="A Pagar"
+                        tooltip="Total de contas pendentes de pagamento no mês atual."
                         value={`R$ ${fmt(stats.payable.amount)}`}
                         caption={
                             <span style={{ color: '#DC2626' }}>
@@ -70,7 +78,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                         }
                     />
 
-                    <StatCard label="Tarefas">
+                    <StatCard label="Tarefas" tooltip="Progresso das tarefas da semana atual. Mostra quantas foram concluídas.">
                         <div className="flex items-center justify-between">
                             <div>
                                 <span className="font-mono text-[28px] font-semibold leading-none text-[#7C3AED]">
@@ -84,6 +92,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
 
                     <StatCard
                         label="Dispensa"
+                        tooltip="Quantidade de itens na dispensa com estoque abaixo do mínimo definido."
                         value={`${stats.dispensa.alerts} itens`}
                         accent="#D97706"
                         caption="abaixo do mínimo"
@@ -245,7 +254,10 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                                             key={event.id}
                                             className="flex items-center gap-3 border-b border-[#E4E3E0] px-5 py-3 transition-colors last:border-0 hover:bg-[#F8F8F7]"
                                         >
-                                            <span className="w-12 shrink-0 font-mono text-xs text-[#D97706]">{event.time}</span>
+                                            <div className="w-16 shrink-0">
+                                                <p className="font-mono text-xs text-[#D97706]">{event.time}</p>
+                                                <p className="font-mono text-[10px] text-[#9B9A96]">{event.date}</p>
+                                            </div>
                                             <div className="size-1.5 rounded-full bg-[#D97706]" />
                                             <span className="flex-1 text-sm text-[#1A1917]">{event.title}</span>
                                         </div>

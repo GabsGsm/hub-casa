@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { HelpCircle, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import { ConfirmDialog } from '@/components/hub/confirm-dialog';
@@ -7,6 +7,7 @@ import { ProgressBar } from '@/components/hub/progress-bar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     Select,
     SelectContent,
@@ -127,6 +128,13 @@ export default function Compras({ items }: ComprasProps) {
         { key: 'impossibilitado', label: 'Impeditivos', count: items.filter(i => i.status === 'impossibilitado').length },
     ];
 
+    const filterTooltips: Record<Filter, string> = {
+        todos:           'Exibe todos os itens da lista de compras',
+        pendente:        'Itens que ainda precisam ser comprados',
+        comprado:        'Itens já adquiridos',
+        impossibilitado: 'Itens que não puderam ser comprados (ex: indisponível, sem orçamento)',
+    };
+
     return (
         <AppLayout breadcrumbs={[
             { title: 'Dashboard', href: '/dashboard' },
@@ -138,7 +146,17 @@ export default function Compras({ items }: ComprasProps) {
                 {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-[28px] font-semibold leading-tight text-[#1A1917]">Compras</h1>
+                        <div className="flex items-center gap-1.5">
+                            <h1 className="text-[28px] font-semibold leading-tight text-[#1A1917]">Compras</h1>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="mt-1 cursor-help">
+                                        <HelpCircle size={14} className="text-[#C8C7C3]" />
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Lista de compras compartilhada da casa. Marque itens como comprados ao adquiri-los.</TooltipContent>
+                            </Tooltip>
+                        </div>
                         <p className="text-sm text-[#9B9A96]">Lista de compras da casa.</p>
                     </div>
                 </div>
@@ -168,34 +186,43 @@ export default function Compras({ items }: ComprasProps) {
                         placeholder="Adicionar item... (Ex: Arroz 5kg)"
                         className="flex-1 rounded-[10px] border-[#E4E3E0] bg-white"
                     />
-                    <Button type="submit" disabled={!inlineValue.trim()} className="gap-2 shrink-0">
-                        <Plus size={14} />
-                        Adicionar
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button type="submit" disabled={!inlineValue.trim()} className="gap-2 shrink-0">
+                                <Plus size={14} />
+                                Adicionar
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Adicionar item à lista de compras (ou pressione Enter)</TooltipContent>
+                    </Tooltip>
                 </form>
 
                 {/* Filter chips */}
                 <div className="flex flex-wrap items-center gap-2">
                     {filters.map(({ key, label, count }) => (
-                        <button
-                            key={key}
-                            type="button"
-                            onClick={() => setFilter(key)}
-                            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                                filter === key
-                                    ? 'bg-[#1A1917] text-white'
-                                    : 'bg-[#F0EFED] text-[#6B6A67] hover:bg-[#E4E3E0]'
-                            }`}
-                        >
-                            {label}
-                            {count !== undefined && (
-                                <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
-                                    filter === key ? 'bg-white/20' : 'bg-white text-[#9B9A96]'
-                                }`}>
-                                    {count}
-                                </span>
-                            )}
-                        </button>
+                        <Tooltip key={key}>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => setFilter(key)}
+                                    className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                                        filter === key
+                                            ? 'bg-[#1A1917] text-white'
+                                            : 'bg-[#F0EFED] text-[#6B6A67] hover:bg-[#E4E3E0]'
+                                    }`}
+                                >
+                                    {label}
+                                    {count !== undefined && (
+                                        <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
+                                            filter === key ? 'bg-white/20' : 'bg-white text-[#9B9A96]'
+                                        }`}>
+                                            {count}
+                                        </span>
+                                    )}
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent>{filterTooltips[key]}</TooltipContent>
+                        </Tooltip>
                     ))}
                 </div>
 

@@ -3,6 +3,7 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
+    HelpCircle,
     List,
     Plus,
     Trash2,
@@ -10,6 +11,7 @@ import {
 import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/hub/confirm-dialog';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     Sheet,
     SheetContent,
@@ -80,7 +82,7 @@ export default function Agenda({ events }: AgendaProps) {
         return Array.from({ length: 7 }, (_, i) => {
             const d = new Date(monday);
             d.setDate(monday.getDate() + i);
-            return d.toISOString().slice(0, 10);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         });
     }, [today, weekOffset]);
 
@@ -170,6 +172,12 @@ export default function Agenda({ events }: AgendaProps) {
         { key: 'list', label: 'Lista', icon: <List size={14} /> },
     ];
 
+    const viewTooltips: Record<View, string> = {
+        monthly: 'Visualização mensal com calendário',
+        weekly:  'Visualização semanal com colunas por dia',
+        list:    'Lista de todos os compromissos em ordem cronológica',
+    };
+
     return (
         <AppLayout breadcrumbs={[
             { title: 'Dashboard', href: '/dashboard' },
@@ -181,32 +189,51 @@ export default function Agenda({ events }: AgendaProps) {
                 {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-[28px] font-semibold leading-tight text-[#1A1917]">Agenda</h1>
+                        <div className="flex items-center gap-1.5">
+                            <h1 className="text-[28px] font-semibold leading-tight text-[#1A1917]">Agenda</h1>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="mt-1 cursor-help">
+                                        <HelpCircle size={14} className="text-[#C8C7C3]" />
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Cadastre e visualize compromissos e eventos da casa.</TooltipContent>
+                            </Tooltip>
+                        </div>
                         <p className="text-sm text-[#9B9A96]">Compromissos e eventos da casa.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {/* View switcher */}
                         <div className="flex items-center rounded-[8px] border border-[#E4E3E0] bg-white p-0.5">
                             {views.map(({ key, label, icon }) => (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    onClick={() => setView(key)}
-                                    className={`flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-xs font-medium transition-colors ${
-                                        view === key
-                                            ? 'bg-[#1A1917] text-white'
-                                            : 'text-[#6B6A67] hover:text-[#1A1917]'
-                                    }`}
-                                >
-                                    {icon}
-                                    {label}
-                                </button>
+                                <Tooltip key={key}>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            type="button"
+                                            onClick={() => setView(key)}
+                                            className={`flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-xs font-medium transition-colors ${
+                                                view === key
+                                                    ? 'bg-[#1A1917] text-white'
+                                                    : 'text-[#6B6A67] hover:text-[#1A1917]'
+                                            }`}
+                                        >
+                                            {icon}
+                                            {label}
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{viewTooltips[key]}</TooltipContent>
+                                </Tooltip>
                             ))}
                         </div>
-                        <Button onClick={() => openCreate()} className="gap-2">
-                            <Plus size={14} />
-                            Novo compromisso
-                        </Button>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button onClick={() => openCreate()} className="gap-2">
+                                    <Plus size={14} />
+                                    Novo compromisso
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Adicionar um novo evento ou compromisso à agenda</TooltipContent>
+                        </Tooltip>
                     </div>
                 </div>
 
@@ -217,15 +244,25 @@ export default function Agenda({ events }: AgendaProps) {
                         <div className="overflow-hidden rounded-[12px] border border-[#E4E3E0] bg-white">
                             {/* Month nav */}
                             <div className="flex items-center justify-between border-b border-[#E4E3E0] px-5 py-3">
-                                <button type="button" onClick={prevMonth} className="flex size-7 items-center justify-center rounded-[6px] hover:bg-[#F0EFED]">
-                                    <ChevronLeft size={16} className="text-[#6B6A67]" />
-                                </button>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button type="button" onClick={prevMonth} className="flex size-7 items-center justify-center rounded-[6px] hover:bg-[#F0EFED]">
+                                            <ChevronLeft size={16} className="text-[#6B6A67]" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Mês anterior</TooltipContent>
+                                </Tooltip>
                                 <span className="font-medium text-[#1A1917]">
                                     {formatMonthYear(calYear, calMonth)}
                                 </span>
-                                <button type="button" onClick={nextMonth} className="flex size-7 items-center justify-center rounded-[6px] hover:bg-[#F0EFED]">
-                                    <ChevronRight size={16} className="text-[#6B6A67]" />
-                                </button>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button type="button" onClick={nextMonth} className="flex size-7 items-center justify-center rounded-[6px] hover:bg-[#F0EFED]">
+                                            <ChevronRight size={16} className="text-[#6B6A67]" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Próximo mês</TooltipContent>
+                                </Tooltip>
                             </div>
                             {/* Day headers */}
                             <div className="grid grid-cols-7 border-b border-[#E4E3E0]">
@@ -313,17 +350,32 @@ export default function Agenda({ events }: AgendaProps) {
                     <div className="flex flex-col gap-4">
                         {/* Week nav */}
                         <div className="flex items-center gap-3">
-                            <button type="button" onClick={() => setWeekOffset(w => w - 1)} className="flex size-7 items-center justify-center rounded-[6px] border border-[#E4E3E0] hover:bg-[#F0EFED]">
-                                <ChevronLeft size={14} className="text-[#6B6A67]" />
-                            </button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button type="button" onClick={() => setWeekOffset(w => w - 1)} className="flex size-7 items-center justify-center rounded-[6px] border border-[#E4E3E0] hover:bg-[#F0EFED]">
+                                        <ChevronLeft size={14} className="text-[#6B6A67]" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Semana anterior</TooltipContent>
+                            </Tooltip>
                             <span className="font-mono text-sm text-[#3D3C3A]">{weekLabel}</span>
-                            <button type="button" onClick={() => setWeekOffset(w => w + 1)} className="flex size-7 items-center justify-center rounded-[6px] border border-[#E4E3E0] hover:bg-[#F0EFED]">
-                                <ChevronRight size={14} className="text-[#6B6A67]" />
-                            </button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button type="button" onClick={() => setWeekOffset(w => w + 1)} className="flex size-7 items-center justify-center rounded-[6px] border border-[#E4E3E0] hover:bg-[#F0EFED]">
+                                        <ChevronRight size={14} className="text-[#6B6A67]" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Próxima semana</TooltipContent>
+                            </Tooltip>
                             {weekOffset !== 0 && (
-                                <button type="button" onClick={() => setWeekOffset(0)} className="text-xs text-[#9B9A96] hover:text-[#1A1917]">
-                                    Hoje
-                                </button>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button type="button" onClick={() => setWeekOffset(0)} className="text-xs text-[#9B9A96] hover:text-[#1A1917]">
+                                            Hoje
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Voltar para a semana atual</TooltipContent>
+                                </Tooltip>
                             )}
                         </div>
 
