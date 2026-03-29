@@ -106,7 +106,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                     <div className="flex flex-col gap-4">
 
                         {/* Ciclos de Pagamento */}
-                        <div className="overflow-hidden rounded-[12px] border border-[#E4E3E0] bg-white">
+                        <div className="overflow-hidden rounded-xl border border-[#E4E3E0] bg-white">
                             <div className="border-b border-[#E4E3E0] px-5 py-4">
                                 <h2 className="text-sm font-medium text-[#1A1917]">Ciclos de Pagamento</h2>
                             </div>
@@ -144,7 +144,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                         </div>
 
                         {/* Últimos Lançamentos */}
-                        <div className="overflow-hidden rounded-[12px] border border-[#E4E3E0] bg-white">
+                        <div className="overflow-hidden rounded-xl border border-[#E4E3E0] bg-white">
                             <div className="border-b border-[#E4E3E0] px-5 py-4">
                                 <h2 className="text-sm font-medium text-[#1A1917]">Últimos Lançamentos</h2>
                             </div>
@@ -162,7 +162,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                                                 style={{
                                                     background:
                                                         item.type === 'ganho' ? '#059669'
-                                                        : item.type === 'divida' ? '#DC2626'
+                                                        : item.type === 'parcela' ? '#DC2626'
                                                         : '#2563EB',
                                                 }}
                                             />
@@ -197,7 +197,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                     <div className="flex flex-col gap-4">
 
                         {/* Tarefas de hoje */}
-                        <div className="overflow-hidden rounded-[12px] border border-[#E4E3E0] bg-white">
+                        <div className="overflow-hidden rounded-xl border border-[#E4E3E0] bg-white">
                             <div className="flex items-center justify-between border-b border-[#E4E3E0] px-5 py-4">
                                 <div>
                                     <h2 className="text-sm font-medium text-[#1A1917]">Tarefas de hoje</h2>
@@ -241,7 +241,7 @@ export default function Dashboard({ stats, cycles, transactions, tasksToday, tod
                         </div>
 
                         {/* Próximos Compromissos */}
-                        <div className="overflow-hidden rounded-[12px] border border-[#E4E3E0] bg-white">
+                        <div className="overflow-hidden rounded-xl border border-[#E4E3E0] bg-white">
                             <div className="border-b border-[#E4E3E0] px-5 py-4">
                                 <h2 className="text-sm font-medium text-[#1A1917]">Próximos compromissos</h2>
                             </div>

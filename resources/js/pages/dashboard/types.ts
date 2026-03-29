@@ -25,7 +25,7 @@ export type DashboardProps = {
         id: number;
         title: string;
         amount: number;
-        type: string;
+        type: 'gasto' | 'ganho' | 'parcela';
         effective_date: string;
         category: { name: string; color: string | null } | null;
     }[];

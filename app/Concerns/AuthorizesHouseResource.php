@@ -9,7 +9,10 @@ trait AuthorizesHouseResource
 {
     protected function ensureCanEdit(User $user, Model $resource): void
     {
-        if ($resource->house_id !== $user->house_id) {
+        // Suporta tanto house_id (módulos antigos) quanto casa_id (financeiro refatorado)
+        $resourceHouseId = $resource->casa_id ?? $resource->house_id ?? null;
+
+        if ($resourceHouseId !== $user->house_id) {
             abort(403);
         }
 
@@ -17,11 +20,19 @@ trait AuthorizesHouseResource
             return;
         }
 
-        if (isset($resource->created_by) && $resource->created_by === $user->id) {
+        // Suporta criado_por (financeiro) e created_by (outros módulos)
+        $createdBy = $resource->criado_por ?? $resource->created_by ?? null;
+
+        if ($createdBy !== null && $createdBy === $user->id) {
             return;
         }
 
-        if (method_exists($resource, 'assignees')) {
+        // Suporta responsaveis() (financeiro) e assignees() (outros módulos)
+        if (method_exists($resource, 'responsaveis')) {
+            if ($resource->responsaveis()->where('user_id', $user->id)->exists()) {
+                return;
+            }
+        } elseif (method_exists($resource, 'assignees')) {
             if ($resource->assignees()->where('user_id', $user->id)->exists()) {
                 return;
             }
