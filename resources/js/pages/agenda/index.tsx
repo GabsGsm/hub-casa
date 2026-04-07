@@ -202,9 +202,9 @@ export default function Agenda({ events }: AgendaProps) {
                         </div>
                         <p className="text-sm text-[#9B9A96]">Compromissos e eventos da casa.</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex gap-2 flex-col sm:flex-row items-stretch sm:items-center w-full sm:w-auto">
                         {/* View switcher */}
-                        <div className="flex items-center rounded-[8px] border border-[#E4E3E0] bg-white p-0.5">
+                        <div className="flex items-center rounded-[8px] border border-[#E4E3E0] bg-white p-0.5 justify-around">
                             {views.map(({ key, label, icon }) => (
                                 <Tooltip key={key}>
                                     <TooltipTrigger asChild>

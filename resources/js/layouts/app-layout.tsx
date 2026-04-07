@@ -26,7 +26,7 @@ const NAV_ITEMS = [
     { label: 'Tarefas',    href: '/tarefas',    icon: CheckSquare,     color: '#7C3AED', mobileVisible: true  },
     { label: 'Agenda',     href: '/agenda',     icon: CalendarDays,    color: '#D97706', mobileVisible: true  },
     { label: 'Compras',    href: '/compras',    icon: ShoppingCart,    color: '#1A1917', mobileVisible: true  },
-    { label: 'Dispensa',   href: '/dispensa',   icon: Package,         color: '#1A1917', mobileVisible: false },
+    { label: 'Dispensa',   href: '/dispensa',   icon: Package,         color: '#1A1917', mobileVisible: true  },
 ] as const;
 
 // ── Avatar ────────────────────────────────────────────────────────────────────

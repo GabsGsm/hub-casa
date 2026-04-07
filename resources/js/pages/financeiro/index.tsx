@@ -422,15 +422,15 @@ export default function Financeiro({
                     </div>
                 </div>
 
-                {/* ── Resumo do mês (valores do backend) ── */}
-                <div className="grid grid-cols-3 gap-3">
+                {/* ── Resumo do mês ── */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full"> 
                     {[
                         { label: 'Receitas', value: resumo.total_receitas, color: '#059669' },
                         { label: 'Despesas', value: resumo.total_despesas, color: '#DC2626' },
                         { label: 'Saldo',    value: resumo.saldo,          color: resumo.saldo >= 0 ? '#059669' : '#DC2626' },
                     ].map((s) => (
-                        <div key={s.label} className="rounded-xl border border-[#E4E3E0] bg-white p-4">
-                            <p className="mb-1 text-xs text-[#9B9A96]">{s.label}</p>
+                        <div key={s.label} className="rounded-xl border border-[#E4E3E0] bg-white p-4 flex flex-col items-start justify-center">
+                            <p className="mb-1 text-xs text-[#9B9A96] font-medium uppercase tracking-wider">{s.label}</p>
                             <span className="font-mono text-[20px] font-semibold leading-none" style={{ color: s.color }}>
                                 {s.value < 0 ? '-' : ''}
                                 {currency.format(Math.abs(s.value))}
@@ -495,61 +495,64 @@ export default function Financeiro({
                             ))}
                         </div>
 
-                        {filteredTx.length === 0 ? (
-                            <div className="px-5 py-8 text-center text-sm text-[#9B9A96]">
-                                Nenhum lançamento{isFuture ? ' projetado' : ''} para este mês.
-                            </div>
-                        ) : (
-                            filteredTx.map((item) => (
-                                <div
-                                    key={`${item.tipo_registro}-${item.id}`}
-                                    className="group grid cursor-pointer grid-cols-1 items-center gap-2 border-b border-[#E4E3E0] px-5 py-2.5 last:border-0 hover:bg-[#F8F8F7] md:grid-cols-[2fr_1fr_1fr_1fr_1fr_32px] md:gap-4"
-                                >
-                                    {/* Descrição */}
-                                    <div>
+                        {filteredTx.map((item) => (
+                            <div
+                                key={`${item.tipo_registro}-${item.id}`}
+                                className="group relative flex flex-col gap-3 border-b border-[#E4E3E0] px-5 py-4 last:border-0 hover:bg-[#F8F8F7] md:grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr_32px] md:items-center md:gap-4 md:py-2.5"
+                            >
+                                {/* Bloco Superior: Título + Valor (Mobile) / Descrição (Desktop) */}
+                                <div className="flex items-start justify-between pr-10 md:pr-0 md:contents">
+                                    <div className="flex-1">
                                         <div className="flex flex-wrap items-center gap-1.5">
-                                            <p className="text-sm text-[#1A1917]">{item.titulo}</p>
+                                            <p className="text-sm font-medium text-[#1A1917] md:font-normal">{item.titulo}</p>
                                             {isGasto(item) && item.recorrente && (
                                                 <span className="rounded-full bg-purple-50 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[#7C3AED]">
                                                     Recorrente
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                        
+                                        {/* Categorias e Parcelas */}
+                                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                             {item.categoria && (
-                                                <span className="rounded-full bg-[#F0EFED] px-2 py-0.5 text-xs text-[#6B6A67]">
+                                                <span className="rounded-full bg-[#F0EFED] px-2 py-0.5 text-[11px] text-[#6B6A67]">
                                                     {item.categoria.name}
                                                 </span>
                                             )}
                                             {isParcela(item) && (
-                                                <span className="font-mono text-xs text-[#9B9A96]">
-                                                    {item.numero_parcela}/{item.total_parcelas} parcelas
+                                                <span className="font-mono text-[11px] text-[#9B9A96]">
+                                                    {item.numero_parcela}/{item.total_parcelas}
                                                 </span>
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* Valor */}
-                                    <span
-                                        className="font-mono text-sm"
-                                        style={{ color: item.tipo_registro === 'ganho' ? '#059669' : '#1A1917' }}
-                                    >
-                                        {item.tipo_registro === 'ganho' ? '+' : ''}
-                                        {currency.format(item.valor)}
-                                    </span>
+                                    {/* Valor: Fica à direita no mobile, e na sua coluna no desktop */}
+                                    <div className="text-right md:text-left">
+                                        <span
+                                            className="font-mono text-sm font-semibold md:font-normal"
+                                            style={{ color: item.tipo_registro === 'ganho' ? '#059669' : '#1A1917' }}
+                                        >
+                                            {item.tipo_registro === 'ganho' ? '+' : ''}
+                                            {currency.format(item.valor)}
+                                        </span>
+                                    </div>
+                                </div>
 
+                                {/* Bloco Inferior: Info secundária (Vencimento, Ciclo, Status) */}
+                                <div className="flex flex-wrap items-center gap-3 md:contents">
                                     {/* Vencimento */}
-                                    <span className="font-mono text-sm text-[#6B6A67]">
+                                    <span className="font-mono text-xs text-[#6B6A67] md:text-sm">
                                         {item.vencimento_resolvido ?? '—'}
                                     </span>
 
                                     {/* Ciclo */}
-                                    <div>
+                                    <div className="scale-90 origin-left md:scale-100">
                                         <CyclePill label={('ciclo' in item && item.ciclo?.name) || 'Sem ciclo'} />
                                     </div>
 
                                     {/* Status */}
-                                    <div>
+                                    <div className="scale-90 origin-left md:scale-100">
                                         {isFuture ? (
                                             <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-mono text-[10px] font-medium text-[#D97706]">
                                                 projetado
@@ -558,36 +561,47 @@ export default function Financeiro({
                                             <StatusPill status={item.status} />
                                         )}
                                     </div>
+                                </div>
 
-                                    {/* Ações */}
-                                    <div>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <button className="flex size-7 items-center justify-center rounded-[6px] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#F0EFED]">
-                                                    <MoreHorizontal size={14} className="text-[#6B6A67]" />
-                                                </button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                {item.status !== 'pago' && !isFuture && (
-                                                    <DropdownMenuItem onClick={() => markAsPaid(item)}>
-                                                        Marcar como pago
-                                                    </DropdownMenuItem>
-                                                )}
-                                                <DropdownMenuItem onClick={() => openEditTx(item)}>
-                                                    Editar
+                                {/* Ações: Posicionado de forma fixa ou discreta no mobile */}
+                                <div className="absolute right-2 top-3 md:relative md:right-0 md:top-0">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className="flex size-8 items-center justify-center rounded-full transition-colors hover:bg-[#F0EFED] md:opacity-0 md:group-hover:opacity-100">
+                                                <MoreHorizontal size={16} className="text-[#6B6A67]" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => openEditTx(item)}>
+                                                Editar
+                                            </DropdownMenuItem>
+                                            {item.tipo_registro !== 'ganho' && item.status !== 'pago' && (
+                                                <DropdownMenuItem onClick={() => markAsPaid(item)}>
+                                                    Marcar como pago
                                                 </DropdownMenuItem>
+                                            )}
+                                            {isParcela(item) && (
                                                 <DropdownMenuItem
-                                                    onClick={() => deleteLancamento(item)}
+                                                    onClick={() => setPendingDelete({
+                                                        action: () => router.delete(parcelamentoEndpointFor(item), { preserveScroll: true }),
+                                                        label: `${item.titulo} (parcelamento inteiro)`,
+                                                    })}
                                                     className="text-[#DC2626] focus:text-[#DC2626]"
                                                 >
-                                                    Remover
+                                                    Remover parcelamento inteiro
                                                 </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
+                                            )}
+                                            <DropdownMenuItem
+                                                onClick={() => deleteLancamento(item)}
+                                                className="text-[#DC2626] focus:text-[#DC2626]"
+                                            >
+                                                Remover
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
-                            ))
-                        )}
+                            </div>
+                        ))}
 
                         {filteredTx.length > 0 && (
                             <div className="grid grid-cols-1 items-center gap-4 border-t-2 border-[#E4E3E0] bg-[#F8F8F7] px-5 py-3 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_32px]">
