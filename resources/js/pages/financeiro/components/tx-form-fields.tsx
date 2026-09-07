@@ -1,5 +1,4 @@
 import InputError from '@/components/input-error';
-import { AssigneeSelect } from '@/components/hub/assignee-select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -11,6 +10,7 @@ import {
 } from '@/components/ui/select';
 import { noneOrVal, valOrNone } from '../utils';
 import type { Cycle, TipoRegistro } from '../types';
+import { MembrosValorSelect, type MembroValorEntry } from './membros-valor-select';
 
 type TxFormFieldsProps = {
     tipoRegistro: TipoRegistro;
@@ -20,9 +20,9 @@ type TxFormFieldsProps = {
     setData: (key: string, value: string) => void;
     cycles: Cycle[];
     categories: { id: number; name: string; color: string | null }[];
-    members: { id: number; name: string }[];
-    assigneeIds: number[];
-    onAssigneesChange: (ids: number[]) => void;
+    members: { id: number; name: string; color: string | null }[];
+    membros: MembroValorEntry[];
+    onMembrosChange: (membros: MembroValorEntry[]) => void;
     isEditing?: boolean;
 };
 
@@ -35,8 +35,8 @@ export function TxFormFields({
     cycles,
     categories,
     members,
-    assigneeIds,
-    onAssigneesChange,
+    membros,
+    onMembrosChange,
     isEditing = false,
 }: TxFormFieldsProps) {
     const isRecorrente = data.recorrente === '1';
@@ -281,14 +281,16 @@ export function TxFormFields({
                 </div>
             )}
 
-            {/* Responsáveis — gastos e parcelas (não na edição de parcela individual) */}
+            {/* Responsáveis com valor — gastos e parcelas (não na edição de parcela individual) */}
             {tipoRegistro !== 'ganho' && !(tipoRegistro === 'parcela' && isEditing) && members.length > 0 && (
                 <div className="grid gap-2">
-                    <Label>Responsáveis</Label>
-                    <AssigneeSelect
+                    <Label>Responsáveis e valores</Label>
+                    <MembrosValorSelect
                         members={members}
-                        selected={assigneeIds}
-                        onChange={onAssigneesChange}
+                        cycles={cycles}
+                        membros={membros}
+                        valorTotal={parseFloat(tipoRegistro === 'parcela' ? data.valor_parcela : data.valor) || 0}
+                        onChange={onMembrosChange}
                     />
                 </div>
             )}

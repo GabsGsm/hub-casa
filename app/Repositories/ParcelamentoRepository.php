@@ -3,7 +3,9 @@
 namespace App\Repositories;
 
 use App\Models\Parcela;
+use App\Models\ParcelaMembroValor;
 use App\Models\Parcelamento;
+use App\Models\ParcelamentoMembroValor;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -19,7 +21,8 @@ class ParcelamentoRepository
             ->with([
                 'parcelamento.categoria:id,name,color',
                 'parcelamento.ciclo:id,name',
-                'parcelamento.responsaveis:id,name',
+                'parcelamento.responsaveis:id,name,color',
+                'membrosValor.user:id,name,color',
             ])
             ->whereYear('vencimento', $year)
             ->whereMonth('vencimento', $month)
@@ -80,6 +83,7 @@ class ParcelamentoRepository
         array $responsavelIds = [],
     ): Parcelamento {
         $valorParcela = (float) $data['valor_parcela'];
+        $membros      = $data['membros'] ?? [];
 
         $parcelamento = Parcelamento::create([
             'casa_id'        => $casaId,
@@ -92,7 +96,9 @@ class ParcelamentoRepository
             'observacoes'    => $data['observacoes'] ?? null,
         ]);
 
-        if (! empty($responsavelIds)) {
+        if (! empty($membros)) {
+            $this->syncParcelamentoMembrosValor($parcelamento, $membros);
+        } elseif (! empty($responsavelIds)) {
             $parcelamento->responsaveis()->sync($responsavelIds);
         }
 
@@ -108,13 +114,26 @@ class ParcelamentoRepository
                 $vencDate->day = min($origDay, $vencDate->daysInMonth);
             }
 
-            Parcela::create([
+            $parcela = Parcela::create([
                 'parcelamento_id' => $parcelamento->id,
                 'numero_parcela'  => $i,
                 'valor_parcela'   => $valorParcela,
                 'status'          => $data['status'] ?? Parcela::STATUS_ABERTO,
                 'vencimento'      => $vencDate->format('Y-m-d'),
             ]);
+
+            // Criar registros de valor por membro para esta parcela (usar ciclo_id por membro)
+            if (! empty($membros)) {
+                foreach ($membros as $membro) {
+                    ParcelaMembroValor::create([
+                        'parcela_id' => $parcela->id,
+                        'user_id'    => $membro['user_id'],
+                        'valor'      => $membro['valor'],
+                        'status'     => 'pendente',
+                        'ciclo_id'   => $membro['ciclo_id'] ?? null,
+                    ]);
+                }
+            }
         }
 
         return $parcelamento->load('parcelas');
@@ -130,11 +149,53 @@ class ParcelamentoRepository
         $parcelamento->fill(array_intersect_key($data, array_flip($allowed)));
         $parcelamento->save();
 
-        if ($responsavelIds !== null) {
+        if (! empty($data['membros'])) {
+            $this->syncParcelamentoMembrosValor($parcelamento, $data['membros']);
+        } elseif ($responsavelIds !== null) {
             $parcelamento->responsaveis()->sync($responsavelIds);
         }
 
         return $parcelamento;
+    }
+
+    /**
+     * Adiciona uma nova parcela a um parcelamento existente.
+     */
+    public function addParcela(Parcelamento $parcelamento, array $data): Parcela
+    {
+        $numero = $parcelamento->parcelas()->max('numero_parcela') + 1;
+
+        $parcela = Parcela::create([
+            'parcelamento_id' => $parcelamento->id,
+            'numero_parcela'  => $numero,
+            'valor_parcela'   => $data['valor_parcela'],
+            'status'          => $data['status'] ?? Parcela::STATUS_ABERTO,
+            'vencimento'      => $data['vencimento'],
+        ]);
+
+        $parcelamento->total_parcelas = $parcelamento->parcelas()->count();
+        $parcelamento->valor_total    = $parcelamento->parcelas()->sum('valor_parcela');
+        $parcelamento->save();
+
+        return $parcela;
+    }
+
+    private function syncParcelamentoMembrosValor(Parcelamento $parcelamento, array $membros): void
+    {
+        $parcelamento->membrosValor()->delete();
+
+        foreach ($membros as $membro) {
+            ParcelamentoMembroValor::create([
+                'parcelamento_id' => $parcelamento->id,
+                'user_id'         => $membro['user_id'],
+                'valor'           => $membro['valor'],
+                'status'          => 'pendente',
+                'ciclo_id'        => $parcelamento->ciclo_id,
+            ]);
+        }
+
+        // Mantém a pivot antiga sincronizada para compatibilidade
+        $parcelamento->responsaveis()->sync(array_column($membros, 'user_id'));
     }
 
     /**
@@ -154,7 +215,33 @@ class ParcelamentoRepository
             $parcelamento->save();
         }
 
+        // Sincronizar membros_valor se vier no payload
+        if (isset($data['membros'])) {
+            $this->syncParcelaMembrosValor($parcela, $data['membros']);
+        }
+
         return $parcela;
+    }
+
+    private function syncParcelaMembrosValor(Parcela $parcela, array $membros): void
+    {
+        $parcela->membrosValor()->delete();
+
+        foreach ($membros as $membro) {
+            ParcelaMembroValor::create([
+                'parcela_id' => $parcela->id,
+                'user_id'    => $membro['user_id'],
+                'valor'      => $membro['valor'],
+                'status'     => 'pendente',
+                'ciclo_id'   => $membro['ciclo_id'] ?? null,
+            ]);
+        }
+
+        // Sincronizar responsaveis no parcelamento pai para consistência
+        $existingIds = $parcela->parcelamento->responsaveis()->pluck('user_id')->toArray();
+        $novoIds     = array_column($membros, 'user_id');
+        $merged      = array_unique(array_merge($existingIds, $novoIds));
+        $parcela->parcelamento->responsaveis()->sync($merged);
     }
 
     /**
@@ -194,6 +281,18 @@ class ParcelamentoRepository
     {
         $par = $p->parcelamento;
 
+        $membrosValor = $p->membrosValor
+            ->map(fn ($mv) => [
+                'user_id'    => $mv->user_id,
+                'user_name'  => $mv->user?->name,
+                'user_color' => $mv->user?->color,
+                'valor'      => (float) $mv->valor,
+                'status'     => $mv->status,
+                'ciclo_id'   => $mv->ciclo_id,
+            ])
+            ->values()
+            ->toArray();
+
         return [
             'id'                   => $p->id,
             'parcelamento_id'      => $par->id,
@@ -213,9 +312,11 @@ class ParcelamentoRepository
                 ? ['id' => $par->categoria->id, 'name' => $par->categoria->name, 'color' => $par->categoria->color]
                 : null,
             'responsaveis'         => $par->responsaveis
-                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'color' => $u->color])
                 ->values()
                 ->toArray(),
+            'membros_valor'        => $membrosValor,
+            'sem_responsavel'      => $par->responsaveis->isEmpty() && empty($membrosValor),
         ];
     }
 }

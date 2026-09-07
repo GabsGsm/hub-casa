@@ -8,23 +8,31 @@ type CycleCardProps = {
     pending: number;
     committed: number;
     isNoCycle?: boolean;
+    userColor?: string | null;
 };
 
-export function CycleCard({ name, expectedAmount, paid, pending, committed, isNoCycle = false }: CycleCardProps) {
+export function CycleCard({ name, expectedAmount, paid, pending, committed, isNoCycle = false, userColor }: CycleCardProps) {
     const total    = isNoCycle ? paid + pending : expectedAmount;
     const over     = !isNoCycle && committed > expectedAmount;
     const color    = isNoCycle ? '#9B9A96' : '#2563EB';
     const allPaid  = !isNoCycle && pending === 0 && paid > 0;
+
+    const borderColor = over
+        ? '#DC2626'
+        : isNoCycle
+            ? undefined
+            : (userColor ?? undefined);
 
     return (
         <div
             className={`rounded-[12px] border bg-white p-5 ${
                 over ? 'border-[#DC2626]' : isNoCycle ? 'border-dashed border-[#E4E3E0]' : 'border-[#E4E3E0]'
             }`}
+            style={borderColor && !over && !isNoCycle ? { borderLeftColor: borderColor, borderLeftWidth: '3px' } : undefined}
         >
             <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm text-[#6B6A67]">
-                    {isNoCycle ? 'Sem data fixo' : `Ciclo · ${name}`}
+                    {isNoCycle ? name : `Ciclo · ${name}`}
                 </span>
                 <div className="flex items-center gap-1.5">
                     <div

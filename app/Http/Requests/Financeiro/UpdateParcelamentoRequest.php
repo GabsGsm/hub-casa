@@ -27,7 +27,11 @@ class UpdateParcelamentoRequest extends FormRequest
             'categoria_id'      => ['nullable', 'exists:categories,id'],
             'responsavel_ids'   => ['nullable', 'array'],
             'responsavel_ids.*' => ['integer', 'exists:users,id'],
-            'observacoes'       => ['nullable', 'string', 'max:500'],
+            'membros'             => ['nullable', 'array'],
+            'membros.*.user_id'   => ['required_with:membros', 'integer', 'exists:users,id'],
+            'membros.*.valor'     => ['required_with:membros', 'numeric', 'min:0'],
+            'membros.*.ciclo_id'  => ['nullable', 'exists:payment_cycles,id'],
+            'observacoes'         => ['nullable', 'string', 'max:500'],
         ];
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DispensaController;
 use App\Http\Controllers\FinanceiroController;
@@ -67,6 +68,19 @@ Route::middleware('auth')->group(function () {
                 Route::put('/{parcela}', [FinanceiroController::class, 'updateParcela'])->name('update');
                 Route::delete('/{parcela}', [FinanceiroController::class, 'destroyParcela'])->name('destroy');
             });
+
+            // Categorias
+            Route::prefix('categorias')->name('categorias.')->group(function () {
+                Route::post('/', [CategoryController::class, 'store'])->name('store');
+                Route::put('/{category}', [CategoryController::class, 'update'])->name('update');
+                Route::delete('/{category}', [CategoryController::class, 'destroy'])->name('destroy');
+            });
+
+            // Tela de gerenciamento de parcelas de um parcelamento
+            Route::get('/parcelamentos/{parcelamento}/parcelas', [FinanceiroController::class, 'showParcelas'])
+                ->name('parcelamentos.parcelas');
+            Route::post('/parcelamentos/{parcelamento}/parcelas', [FinanceiroController::class, 'storeParcela'])
+                ->name('parcelamentos.parcelas.store');
         });
 
         Route::prefix('tarefas')->name('tarefas.')->group(function () {

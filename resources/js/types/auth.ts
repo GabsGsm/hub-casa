@@ -5,6 +5,7 @@ export type User = {
     avatar?: string;
     house_id?: number | null;
     role?: 'admin' | 'user';
+    color?: string | null;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
     created_at: string;
