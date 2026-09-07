@@ -3,7 +3,6 @@
 namespace App\Repositories;
 
 use App\Models\Gasto;
-use App\Models\GastoMembroValor;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -16,145 +15,24 @@ class GastoRepository
      */
     public function getResolvedForMonth(int $casaId, int $year, int $month): Collection
     {
-        $now            = Carbon::now();
-        $isCurrentMonth = ($year === $now->year && $month === $now->month);
-        $mesRef         = Carbon::create($year, $month, 1)->startOfMonth();
-
-        // Carregar gastos base (não-instâncias) e instâncias do mês
         $all = Gasto::query()
-            ->with([
-                'categoria:id,name,color',
-                'ciclo:id,name',
-                'responsaveis:id,name,color',
-                'membrosValor.user:id,name,color',
-                'membrosValor.ciclo:id,name',
-            ])
+            ->with('categoria:id,name,color', 'ciclo:id,name', 'responsaveis:id,name')
             ->where('casa_id', $casaId)
-            ->where(function ($q) use ($mesRef) {
-                // Gastos base (recorrentes sem parent ou não-recorrentes)
-                $q->whereNull('parent_gasto_id')
-                  // OU instâncias criadas exatamente para este mês
-                  ->orWhere('mes_referencia', $mesRef->format('Y-m-d'));
-            })
             ->get();
 
-        $result    = collect();
-        $mesRefStr = $mesRef->format('Y-m-d');
+        $result = collect();
+        $now            = Carbon::now();
+        $isCurrentMonth = ($year === $now->year && $month === $now->month);
 
-        // Separar bases recorrentes e pontuais (sem parent)
-        $bases    = $all->where('recorrente', true)->whereNull('parent_gasto_id');
-        $pontuais = $all->where('recorrente', false)->whereNull('parent_gasto_id');
-
-        // Buscar instâncias do mês via query DB (comparação de DATE no MySQL — correto)
-        // NÃO usar Collection::where() pois Carbon != string em PHP
-        $baseInstances = Gasto::query()
-            ->with([
-                'categoria:id,name,color',
-                'ciclo:id,name',
-                'responsaveis:id,name,color',
-                'membrosValor.user:id,name,color',
-                'membrosValor.ciclo:id,name',
-            ])
-            ->where('casa_id', $casaId)
-            ->whereNotNull('parent_gasto_id')
-            ->where('mes_referencia', $mesRefStr)
-            ->get()
-            ->keyBy('parent_gasto_id');
-
-        foreach ($bases as $base) {
-            // Se já existe uma instância para este mês, usa ela
-            if ($baseInstances->has($base->id)) {
-                $instancia = $baseInstances->get($base->id);
-                $result->push($this->buildPayload($instancia, $instancia->vencimento->format('Y-m-d')));
-                continue;
-            }
-
-            // Buscar instância mais recente antes deste mês
-            $recentInstance = Gasto::query()
-                ->where('parent_gasto_id', $base->id)
-                ->where('mes_referencia', '<', $mesRefStr)
-                ->orderByDesc('mes_referencia')
-                ->first();
-
-            $template = $recentInstance ?? $base;
-
-            if ($isCurrentMonth) {
-                // Mês atual sem instância: criar nova instância
-                $nova = $this->criarInstanciaDoMes($base, $template, $year, $month);
-                $nova->load([
-                    'categoria:id,name,color',
-                    'ciclo:id,name',
-                    'responsaveis:id,name,color',
-                    'membrosValor.user:id,name,color',
-                    'membrosValor.ciclo:id,name',
-                ]);
-                $result->push($this->buildPayload($nova, $nova->vencimento->format('Y-m-d')));
+        foreach ($all as $gasto) {
+            if ($gasto->recorrente) {
+                $result->push(...$this->resolveRecorrente($gasto, $year, $month, $isCurrentMonth));
             } else {
-                // Mês futuro ou passado sem instância: projetar como aberto
-                $origDay   = $template->dia_recorrencia ?? Carbon::parse($template->vencimento ?? $template->created_at)->day;
-                $projected = $this->projectedDate($origDay, $year, $month);
-                $result->push($this->buildPayload($template, $projected, Gasto::STATUS_ABERTO));
+                $result->push(...$this->resolvePontual($gasto, $year, $month));
             }
-        }
-
-        foreach ($pontuais as $gasto) {
-            $result->push(...$this->resolvePontual($gasto, $year, $month));
         }
 
         return $result->sortBy('vencimento_resolvido')->values();
-    }
-
-    private function criarInstanciaDoMes(Gasto $base, Gasto $template, int $year, int $month): Gasto
-    {
-        $mesRefStr  = Carbon::create($year, $month, 1)->format('Y-m-d');
-
-        // Guard: previne criação duplicada mesmo em race conditions
-        $existing = Gasto::query()
-            ->where('parent_gasto_id', $base->id)
-            ->where('mes_referencia', $mesRefStr)
-            ->first();
-
-        if ($existing) {
-            return $existing;
-        }
-
-        $origDay    = $template->dia_recorrencia ?? Carbon::parse($template->vencimento ?? $template->created_at)->day;
-        $newDueDate = Carbon::create($year, $month, min($origDay, Carbon::create($year, $month, 1)->daysInMonth));
-
-        $nova = Gasto::create([
-            'casa_id'         => $base->casa_id,
-            'ciclo_id'        => $template->ciclo_id,
-            'categoria_id'    => $template->categoria_id,
-            'criado_por'      => $base->criado_por,
-            'titulo'          => $template->titulo,
-            'valor'           => $template->valor,
-            'status'          => Gasto::STATUS_ABERTO,
-            'vencimento'      => $newDueDate->format('Y-m-d'),
-            'recorrente'      => false, // instâncias não são recorrentes por si só
-            'dia_recorrencia' => $template->dia_recorrencia,
-            'observacoes'     => $template->observacoes,
-            'parent_gasto_id' => $base->id,
-            'mes_referencia'  => $mesRefStr,
-        ]);
-
-        // Copiar responsaveis
-        $responsaveisIds = $template->responsaveis()->pluck('user_id')->toArray();
-        if (! empty($responsaveisIds)) {
-            $nova->responsaveis()->sync($responsaveisIds);
-        }
-
-        // Copiar membrosValor
-        foreach ($template->membrosValor ?? [] as $mv) {
-            \App\Models\GastoMembroValor::create([
-                'gasto_id' => $nova->id,
-                'user_id'  => $mv->user_id,
-                'valor'    => $mv->valor,
-                'status'   => 'pendente',
-                'ciclo_id' => $mv->ciclo_id,
-            ]);
-        }
-
-        return $nova;
     }
 
     /**
@@ -164,8 +42,7 @@ class GastoRepository
     {
         $query = Gasto::query()
             ->with('categoria:id,name,color', 'ciclo:id,name', 'responsaveis:id,name')
-            ->where('casa_id', $casaId)
-            ->whereNull('parent_gasto_id'); // Excluir instâncias de recorrência
+            ->where('casa_id', $casaId);
 
         if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -199,10 +76,7 @@ class GastoRepository
             'observacoes'     => $data['observacoes'] ?? null,
         ]);
 
-        // Usar novo formato membros se disponível; fallback para responsavel_ids
-        if (! empty($data['membros'])) {
-            $this->syncMembrosValor($gasto, $data['membros']);
-        } elseif (! empty($responsavelIds)) {
+        if (! empty($responsavelIds)) {
             $gasto->responsaveis()->sync($responsavelIds);
         }
 
@@ -219,9 +93,7 @@ class GastoRepository
         $gasto->fill(array_intersect_key($data, array_flip($allowed)));
         $gasto->save();
 
-        if (! empty($data['membros'])) {
-            $this->syncMembrosValor($gasto, $data['membros']);
-        } elseif ($responsavelIds !== null) {
+        if ($responsavelIds !== null) {
             $gasto->responsaveis()->sync($responsavelIds);
         }
 
@@ -231,26 +103,7 @@ class GastoRepository
     public function delete(Gasto $gasto): void
     {
         $gasto->responsaveis()->detach();
-        $gasto->membrosValor()->delete();
         $gasto->delete();
-    }
-
-    private function syncMembrosValor(Gasto $gasto, array $membros): void
-    {
-        $gasto->membrosValor()->delete();
-
-        foreach ($membros as $membro) {
-            GastoMembroValor::create([
-                'gasto_id' => $gasto->id,
-                'user_id'  => $membro['user_id'],
-                'valor'    => $membro['valor'],
-                'status'   => 'pendente',
-                'ciclo_id' => $membro['ciclo_id'] ?? null,
-            ]);
-        }
-
-        // Mantém a pivot antiga sincronizada para compatibilidade
-        $gasto->responsaveis()->sync(array_column($membros, 'user_id'));
     }
 
     /**
@@ -261,7 +114,6 @@ class GastoRepository
         return Gasto::query()
             ->with('categoria:id,name,color')
             ->where('casa_id', $casaId)
-            ->whereNull('parent_gasto_id')
             ->orderByDesc('vencimento')
             ->orderByDesc('created_at')
             ->limit($limit)
@@ -281,6 +133,47 @@ class GastoRepository
     // -------------------------------------------------------------------------
     // Resolução de mês
     // -------------------------------------------------------------------------
+
+    private function resolveRecorrente(Gasto $gasto, int $year, int $month, bool $isCurrentMonth): array
+    {
+        $created = Carbon::parse($gasto->created_at);
+        $afterCreation = ($year > $created->year)
+            || ($year === $created->year && $month >= $created->month);
+
+        if (! $afterCreation) {
+            return [];
+        }
+
+        $effectiveDate = Carbon::parse($gasto->vencimento ?? $gasto->created_at);
+        $dueDateMatchesQuery = ($effectiveDate->year === $year && $effectiveDate->month === $month);
+
+        if ($isCurrentMonth && ! $dueDateMatchesQuery) {
+            // Mês virou: atualiza vencimento e reseta status
+            $origDay    = $gasto->dia_recorrencia ?? $effectiveDate->day;
+            $newDay     = min($origDay, Carbon::create($year, $month, 1)->daysInMonth);
+            $newDueDate = Carbon::create($year, $month, $newDay);
+
+            $gasto->vencimento = $newDueDate;
+            $gasto->status     = Gasto::STATUS_ABERTO;
+            $gasto->saveQuietly();
+
+            return [$this->buildPayload($gasto, $newDueDate->format('Y-m-d'), Gasto::STATUS_ABERTO)];
+        }
+
+        if (! $isCurrentMonth) {
+            // Projeção futura/passada: sempre aberto
+            $origDay = $gasto->dia_recorrencia ?? $effectiveDate->day;
+
+            return [$this->buildPayload(
+                $gasto,
+                $this->projectedDate($origDay, $year, $month),
+                Gasto::STATUS_ABERTO,
+            )];
+        }
+
+        // Mês atual e due_date já corresponde: usa status real
+        return [$this->buildPayload($gasto, $effectiveDate->format('Y-m-d'))];
+    }
 
     private function resolvePontual(Gasto $gasto, int $year, int $month): array
     {
@@ -303,44 +196,27 @@ class GastoRepository
 
     private function buildPayload(Gasto $gasto, string $resolvedDate, ?string $statusOverride = null): array
     {
-        $membrosValor = $gasto->membrosValor
-            ->map(fn ($mv) => [
-                'user_id'    => $mv->user_id,
-                'user_name'  => $mv->user?->name,
-                'user_color' => $mv->user?->color,
-                'valor'      => (float) $mv->valor,
-                'status'     => $mv->status,
-                'ciclo_id'   => $mv->ciclo_id,
-            ])
-            ->values()
-            ->toArray();
-
-        // Instâncias de recorrência (parent_gasto_id preenchido) também são exibidas como recorrentes
-        $isRecorrente = $gasto->recorrente || ! is_null($gasto->parent_gasto_id);
-
         return [
-            'id'                   => $gasto->id,
-            'tipo_registro'        => 'gasto',
-            'titulo'               => $gasto->titulo,
-            'valor'                => (float) $gasto->valor,
-            'status'               => $statusOverride ?? $gasto->status,
-            'vencimento'           => optional($gasto->vencimento)->format('Y-m-d'),
+            'id'                  => $gasto->id,
+            'tipo_registro'       => 'gasto',
+            'titulo'              => $gasto->titulo,
+            'valor'               => (float) $gasto->valor,
+            'status'              => $statusOverride ?? $gasto->status,
+            'vencimento'          => optional($gasto->vencimento)->format('Y-m-d'),
             'vencimento_resolvido' => $resolvedDate,
-            'recorrente'           => $isRecorrente,
-            'dia_recorrencia'      => $gasto->dia_recorrencia,
-            'observacoes'          => $gasto->observacoes,
-            'ciclo'                => $gasto->ciclo
+            'recorrente'          => (bool) $gasto->recorrente,
+            'dia_recorrencia'     => $gasto->dia_recorrencia,
+            'observacoes'         => $gasto->observacoes,
+            'ciclo'               => $gasto->ciclo
                 ? ['id' => $gasto->ciclo->id, 'name' => $gasto->ciclo->name]
                 : null,
-            'categoria'            => $gasto->categoria
+            'categoria'           => $gasto->categoria
                 ? ['id' => $gasto->categoria->id, 'name' => $gasto->categoria->name, 'color' => $gasto->categoria->color]
                 : null,
-            'responsaveis'         => $gasto->responsaveis
-                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'color' => $u->color])
+            'responsaveis'        => $gasto->responsaveis
+                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
                 ->values()
                 ->toArray(),
-            'membros_valor'        => $membrosValor,
-            'sem_responsavel'      => $gasto->responsaveis->isEmpty() && empty($membrosValor),
         ];
     }
 }

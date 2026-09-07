@@ -14,7 +14,6 @@ class PaymentCycleRepository
     public function getByHouse(int $houseId): Collection
     {
         return PaymentCycle::query()
-            ->with('user:id,name,color')
             ->where('house_id', $houseId)
             ->orderBy('name')
             ->get();

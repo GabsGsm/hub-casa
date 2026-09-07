@@ -91,29 +91,6 @@ export default function Profile({
                                     />
                                 </div>
 
-                                <div className="grid gap-2">
-                                    <Label htmlFor="color">Cor de identificação</Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Usada para diferenciar seus lançamentos na visão da casa.
-                                    </p>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            id="color"
-                                            type="color"
-                                            name="color"
-                                            defaultValue={auth.user.color ?? '#6366f1'}
-                                            className="h-10 w-16 cursor-pointer rounded border border-input bg-background p-1"
-                                        />
-                                        <span className="text-sm text-muted-foreground">
-                                            Clique para escolher uma cor
-                                        </span>
-                                    </div>
-                                    <InputError
-                                        className="mt-2"
-                                        message={errors.color}
-                                    />
-                                </div>
-
                                 {mustVerifyEmail &&
                                     auth.user.email_verified_at === null && (
                                         <div>

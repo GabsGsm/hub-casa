@@ -1,5 +1,5 @@
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { AlertTriangle, ChevronLeft, ChevronRight, HelpCircle, MoreHorizontal, Plus, Settings, Trash2 } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { ChevronLeft, ChevronRight, HelpCircle, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import InputError from '@/components/input-error';
 import { ConfirmDialog } from '@/components/hub/confirm-dialog';
@@ -23,12 +23,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
-import { CategoryManager } from './components/category-manager';
 import { CycleCard } from './components/cycle-card';
 import { TxDrawer } from './components/tx-drawer';
 import { TxFormFields } from './components/tx-form-fields';
 import type { Cycle, FinanceiroProps, Lancamento, TipoRegistro, TxFilter } from './types';
-import type { MembroValorEntry } from './components/membros-valor-select';
 import { currency, MONTH_NAMES_FULL, TX_FILTERS } from './utils';
 
 // ── Helpers de tipo ──────────────────────────────────────────────────────────
@@ -37,49 +35,6 @@ function isGasto(l: Lancamento): l is Extract<Lancamento, { tipo_registro: 'gast
 }
 function isParcela(l: Lancamento): l is Extract<Lancamento, { tipo_registro: 'parcela' }> {
     return l.tipo_registro === 'parcela';
-}
-
-/** Na visão individual, retorna o valor do usuário logado; na visão casa, retorna o valor total. */
-function getMeuValorFromItem(item: Lancamento, visao: string, userId: number): number {
-    if (visao !== 'individual') return item.valor;
-    if (!('membros_valor' in item) || !item.membros_valor.length) return item.valor;
-    const mv = item.membros_valor.find((m) => m.user_id === userId);
-    return mv ? mv.valor : item.valor;
-}
-
-/**
- * Retorna o background CSS para a barra lateral colorida de 3px.
- * Individual: cor sólida do membro logado.
- * Casa com 1 membro: cor sólida.
- * Casa com N membros: gradiente vertical dividido proporcionalmente ao valor de cada membro.
- * Retorna null quando não há membros com cor.
- */
-function getMemberBarBackground(
-    item: Lancamento,
-    visao: string,
-    userId: number,
-): string | null {
-    if (!('membros_valor' in item) || !item.membros_valor.length) return null;
-
-    if (visao === 'individual') {
-        const mv = item.membros_valor.find((m) => m.user_id === userId);
-        return mv?.user_color ?? null;
-    }
-
-    const membros = item.membros_valor.filter((m) => m.user_color);
-    if (!membros.length) return null;
-    if (membros.length === 1) return membros[0].user_color;
-
-    const total = membros.reduce((s, m) => s + m.valor, 0) || 1;
-    let cumulative = 0;
-    const stops: string[] = [];
-    for (const m of membros) {
-        const start = (cumulative / total) * 100;
-        const end   = ((cumulative + m.valor) / total) * 100;
-        stops.push(`${m.user_color} ${start.toFixed(1)}%`, `${m.user_color} ${end.toFixed(1)}%`);
-        cumulative += m.valor;
-    }
-    return `linear-gradient(to bottom, ${stops.join(', ')})`;
 }
 
 /** URL base para criação por tipo de registro */
@@ -113,15 +68,8 @@ export default function Financeiro({
     members,
     year,
     month,
-    visao: visaoProp,
 }: FinanceiroProps) {
-    const { auth } = usePage().props as any;
     const [txFilter, setTxFilter] = useState<TxFilter>('todos');
-    const [catManagerOpen, setCatManagerOpen] = useState(false);
-    const visao = visaoProp ?? 'casa';
-
-    const getMeuValor  = (item: Lancamento) => getMeuValorFromItem(item, visao, auth?.user?.id ?? 0);
-    const getMemberBar = (item: Lancamento) => getMemberBarBackground(item, visao, auth?.user?.id ?? 0);
 
     // ── Navegação de mês ──────────────────────────────────────────────────────
     const now            = new Date();
@@ -133,66 +81,30 @@ export default function Financeiro({
         let y = year;
         if (m < 1)  { m = 12; y -= 1; }
         if (m > 12) { m = 1;  y += 1; }
-        router.visit(`/financeiro?year=${y}&month=${m}&visao=${visao}`, {
-            only: ['lancamentos', 'resumo', 'cycles', 'year', 'month', 'visao'],
+        router.visit(`/financeiro?year=${y}&month=${m}`, {
+            only: ['lancamentos', 'resumo', 'year', 'month'],
             preserveState: true,
             preserveScroll: false,
         });
     }
 
-    function toggleVisao() {
-        const next = visao === 'casa' ? 'individual' : 'casa';
-        router.visit(`/financeiro?year=${year}&month=${month}&visao=${next}`, {
-            only: ['lancamentos', 'resumo', 'cycles', 'visao'],
-            preserveState: true,
-            preserveScroll: true,
-        });
-    }
-
-    // ── Totais por ciclo — agrupando por ciclo_id de cada membro ─────────────
+    // ── Totais por ciclo (filtro visual simples, sem lógica de negócio) ──────
     const cycleMthTotals = useMemo(() => {
-        const userId = auth?.user?.id ?? 0;
         const map: Record<number, { paid: number; pending: number; committed: number }> = {};
-
-        function add(key: number, valor: number, status: string) {
-            if (!map[key]) map[key] = { paid: 0, pending: 0, committed: 0 };
-            if (status === 'pago') { map[key].paid += valor; map[key].committed += valor; }
-            else                   { map[key].pending += valor; map[key].committed += valor; }
-        }
-
         lancamentos.forEach((l) => {
             if (l.tipo_registro === 'ganho' || l.status === 'impossibilitado') return;
-
-            if ('membros_valor' in l && l.membros_valor.length > 0) {
-                for (const mv of l.membros_valor) {
-                    if (visao === 'individual' && mv.user_id !== userId) continue;
-                    add(mv.ciclo_id ?? 0, mv.valor, l.status);
-                }
+            const key = ('ciclo' in l && l.ciclo) ? l.ciclo.id : 0;
+            if (!map[key]) map[key] = { paid: 0, pending: 0, committed: 0 };
+            if (l.status === 'pago') {
+                map[key].paid      += l.valor;
+                map[key].committed += l.valor;
             } else {
-                // Sem membros: usar ciclo da transação
-                if (visao === 'individual') return;
-                // Sem responsável E sem ciclo → card próprio, não entra aqui
-                if (!('ciclo' in l && l.ciclo) && 'sem_responsavel' in l && l.sem_responsavel) return;
-                const key = ('ciclo' in l && l.ciclo) ? l.ciclo.id : 0;
-                add(key, l.valor, l.status);
+                map[key].pending   += l.valor;
+                map[key].committed += l.valor;
             }
         });
         return map;
-    }, [lancamentos, visao, auth?.user?.id]);
-
-    // ── Totais de lançamentos sem responsável e sem ciclo ─────────────────────
-    const semAtribuicao = useMemo(() => {
-        let paid = 0; let pending = 0;
-        if (visao === 'individual') return { paid: 0, pending: 0 };
-        lancamentos.forEach((l) => {
-            if (l.tipo_registro === 'ganho' || l.status === 'impossibilitado') return;
-            if (!('sem_responsavel' in l) || !l.sem_responsavel) return;
-            if ('ciclo' in l && l.ciclo) return; // tem ciclo, vai para o card "Sem ciclo"
-            if (l.status === 'pago') paid += l.valor;
-            else pending += l.valor;
-        });
-        return { paid, pending };
-    }, [lancamentos, visao]);
+    }, [lancamentos]);
 
     // ── Lançamentos filtrados ─────────────────────────────────────────────────
     const filteredTx = useMemo(() => {
@@ -207,7 +119,7 @@ export default function Financeiro({
 
     const tableTotal = filteredTx
         .filter((l) => l.status !== 'impossibilitado')
-        .reduce((s, l) => (l.tipo_registro === 'ganho' ? s + getMeuValor(l) : s - getMeuValor(l)), 0);
+        .reduce((s, l) => (l.tipo_registro === 'ganho' ? s + l.valor : s - l.valor), 0);
 
     // ── Ciclos: criar/editar ──────────────────────────────────────────────────
     const [cycleDialogOpen, setCycleDialogOpen] = useState(false);
@@ -218,7 +130,7 @@ export default function Financeiro({
     // ── Lançamentos: criar ────────────────────────────────────────────────────
     const [txDrawerOpen, setTxDrawerOpen] = useState(false);
     const [createTipo, setCreateTipo] = useState<TipoRegistro>('gasto');
-    const [createMembros, setCreateMembros] = useState<MembroValorEntry[]>([]);
+    const [createAssignees, setCreateAssignees] = useState<number[]>([]);
     const txForm = useForm<Record<string, string>>({
         titulo: '', valor: '', valor_parcela: '', status: 'aberto',
         vencimento: '', data_recebimento: '', ciclo_id: '', categoria_id: '',
@@ -229,7 +141,7 @@ export default function Financeiro({
 
     // ── Lançamentos: editar ───────────────────────────────────────────────────
     const [editingTx, setEditingTx] = useState<Lancamento | null>(null);
-    const [editMembros, setEditMembros] = useState<MembroValorEntry[]>([]);
+    const [editAssignees, setEditAssignees] = useState<number[]>([]);
     const [pendingDelete, setPendingDelete] = useState<{ action: () => void; label: string } | null>(null);
 
     const editTxForm = useForm<Record<string, string>>({
@@ -268,7 +180,7 @@ export default function Financeiro({
 
     // ── Handlers: lançamentos ─────────────────────────────────────────────────
     function openCreateTx() {
-        setCreateMembros([]);
+        setCreateAssignees([]);
         setCreateTipo('gasto');
         txForm.reset();
         setTxDrawerOpen(true);
@@ -276,10 +188,8 @@ export default function Financeiro({
 
     function openEditTx(l: Lancamento) {
         setEditingTx(l);
-        const membrosInit = 'membros_valor' in l && l.membros_valor.length > 0
-            ? l.membros_valor.map((mv) => ({ user_id: mv.user_id, valor: mv.valor, ciclo_id: mv.ciclo_id }))
-            : ('responsaveis' in l ? l.responsaveis.map((r) => ({ user_id: r.id, valor: l.valor / Math.max(l.responsaveis.length, 1), ciclo_id: null })) : []);
-        setEditMembros(membrosInit);
+        const assignees = 'responsaveis' in l ? l.responsaveis.map((a) => a.id) : [];
+        setEditAssignees(assignees);
 
         const base: Record<string, string> = {
             titulo: l.titulo,
@@ -315,7 +225,7 @@ export default function Financeiro({
 
     function submitCreateTx(e: React.FormEvent) {
         e.preventDefault();
-        txForm.transform((d) => ({ ...d, membros: createMembros }));
+        txForm.transform((d) => ({ ...d, responsavel_ids: createAssignees }));
         txForm.post(createEndpointFor(createTipo), {
             preserveScroll: true,
             onSuccess: () => { txForm.reset(); setTxDrawerOpen(false); },
@@ -325,7 +235,7 @@ export default function Financeiro({
     function submitEditTx(e: React.FormEvent) {
         e.preventDefault();
         if (!editingTx) return;
-        editTxForm.transform((d) => ({ ...d, membros: editMembros }));
+        editTxForm.transform((d) => ({ ...d, responsavel_ids: editAssignees }));
         editTxForm.put(itemEndpointFor(editingTx), {
             preserveScroll: true,
             onSuccess: () => setEditingTx(null),
@@ -372,30 +282,7 @@ export default function Financeiro({
 
                 {/* ── Header: título + navegação de mês ── */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-[28px] font-semibold text-[#1A1917]">Financeiro</h1>
-                        {/* Toggle de visão */}
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <button
-                                    type="button"
-                                    onClick={toggleVisao}
-                                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                                        visao === 'individual'
-                                            ? 'border-[#1A1917] bg-[#1A1917] text-white'
-                                            : 'border-[#E4E3E0] bg-white text-[#6B6A67] hover:border-[#9B9A96]'
-                                    }`}
-                                >
-                                    {visao === 'individual' ? 'Individual' : 'Casa'}
-                                </button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                {visao === 'individual'
-                                    ? 'Mostrando apenas seus lançamentos — clique para ver todos da casa'
-                                    : 'Mostrando todos da casa — clique para ver apenas os seus'}
-                            </TooltipContent>
-                        </Tooltip>
-                    </div>
+                    <h1 className="text-[28px] font-semibold text-[#1A1917]">Financeiro</h1>
 
                     <div className="flex items-center gap-3">
                         {isFuture && (
@@ -444,8 +331,8 @@ export default function Financeiro({
                                 <TooltipTrigger asChild>
                                     <button
                                         type="button"
-                                        onClick={() => router.visit(`/financeiro?year=${now.getFullYear()}&month=${now.getMonth() + 1}&visao=${visao}`, {
-                                            only: ['lancamentos', 'resumo', 'cycles', 'year', 'month', 'visao'],
+                                        onClick={() => router.visit(`/financeiro?year=${now.getFullYear()}&month=${now.getMonth() + 1}`, {
+                                            only: ['lancamentos', 'resumo', 'year', 'month'],
                                             preserveState: true,
                                         })}
                                         className="text-sm text-[#9B9A96] transition-colors hover:text-[#1A1917]"
@@ -498,7 +385,6 @@ export default function Financeiro({
                                         paid={mth.paid}
                                         pending={mth.pending}
                                         committed={mth.committed}
-                                        userColor={visao === 'casa' ? cycle.user_color : null}
                                     />
                                     <div className="absolute right-3 top-3 opacity-0 transition-opacity group-hover:opacity-100">
                                         <DropdownMenu>
@@ -532,25 +418,6 @@ export default function Financeiro({
                                 committed={noCycle.committed}
                                 isNoCycle
                             />
-                        )}
-                        {(semAtribuicao.paid > 0 || semAtribuicao.pending > 0) && (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div>
-                                        <CycleCard
-                                            name="⚠ Sem responsável"
-                                            expectedAmount={0}
-                                            paid={semAtribuicao.paid}
-                                            pending={semAtribuicao.pending}
-                                            committed={semAtribuicao.paid + semAtribuicao.pending}
-                                            isNoCycle
-                                        />
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    Lançamentos sem responsável e sem ciclo de pagamento atribuído.
-                                </TooltipContent>
-                            </Tooltip>
                         )}
                     </div>
                 </div>
@@ -609,19 +476,6 @@ export default function Financeiro({
                                 <TooltipTrigger asChild>
                                     <button
                                         type="button"
-                                        onClick={() => setCatManagerOpen(true)}
-                                        className="flex h-9 items-center gap-1.5 rounded-[8px] border border-[#E4E3E0] bg-white px-3 text-sm text-[#6B6A67] transition-colors hover:bg-[#F0EFED] hover:text-[#1A1917]"
-                                    >
-                                        <Settings size={13} />
-                                        Categorias
-                                    </button>
-                                </TooltipTrigger>
-                                <TooltipContent>Gerenciar categorias de lançamentos</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <button
-                                        type="button"
                                         onClick={openCreateTx}
                                         className="flex h-9 items-center gap-1.5 rounded-[8px] bg-[#1A1917] px-4 text-sm text-white transition-colors hover:bg-[#3D3C3A]"
                                     >
@@ -641,23 +495,11 @@ export default function Financeiro({
                             ))}
                         </div>
 
-                        {filteredTx.map((item) => {
-                            const barBg = getMemberBar(item);
-                            return (
+                        {filteredTx.map((item) => (
                             <div
                                 key={`${item.tipo_registro}-${item.id}`}
-                                className="group relative flex flex-col gap-3 border-b border-[#E4E3E0] pl-5.5 pr-5 py-4 last:border-0 hover:bg-[#F8F8F7] md:grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr_32px] md:items-center md:gap-4 md:py-2.5"
+                                className="group relative flex flex-col gap-3 border-b border-[#E4E3E0] px-5 py-4 last:border-0 hover:bg-[#F8F8F7] md:grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr_32px] md:items-center md:gap-4 md:py-2.5"
                             >
-                                {/* Barra lateral de cor do(s) membro(s) */}
-                                {barBg && (
-                                    <div
-                                        aria-hidden
-                                        className="absolute inset-y-0 left-0 w-0.75"
-                                        style={barBg.startsWith('linear-gradient')
-                                            ? { background: barBg }
-                                            : { backgroundColor: barBg }}
-                                    />
-                                )}
                                 {/* Bloco Superior: Título + Valor (Mobile) / Descrição (Desktop) */}
                                 <div className="flex items-start justify-between pr-10 md:pr-0 md:contents">
                                     <div className="flex-1">
@@ -670,7 +512,7 @@ export default function Financeiro({
                                             )}
                                         </div>
                                         
-                                        {/* Categorias, Parcelas e Badges de membros */}
+                                        {/* Categorias e Parcelas */}
                                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                             {item.categoria && (
                                                 <span className="rounded-full bg-[#F0EFED] px-2 py-0.5 text-[11px] text-[#6B6A67]">
@@ -682,23 +524,6 @@ export default function Financeiro({
                                                     {item.numero_parcela}/{item.total_parcelas}
                                                 </span>
                                             )}
-                                            {/* Badges de membros responsáveis */}
-                                            {'membros_valor' in item && item.sem_responsavel && (
-                                                <span className="flex items-center gap-1 text-[11px] text-amber-600">
-                                                    <AlertTriangle size={10} />
-                                                    Sem responsável
-                                                </span>
-                                            )}
-                                            {'membros_valor' in item && item.membros_valor.map((mv) => (
-                                                <span
-                                                    key={mv.user_id}
-                                                    className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
-                                                    style={{ backgroundColor: mv.user_color ?? '#6366f1' }}
-                                                    title={`${mv.user_name}: R$ ${mv.valor.toFixed(2)}`}
-                                                >
-                                                    {mv.user_name?.split(' ')[0]} · R${mv.valor.toFixed(2)}
-                                                </span>
-                                            ))}
                                         </div>
                                     </div>
 
@@ -747,15 +572,9 @@ export default function Financeiro({
                                             </button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                            {isParcela(item) ? (
-                                                <DropdownMenuItem onClick={() => router.visit(`/financeiro/parcelamentos/${item.parcelamento_id}/parcelas`)}>
-                                                    Gerenciar parcelas
-                                                </DropdownMenuItem>
-                                            ) : (
-                                                <DropdownMenuItem onClick={() => openEditTx(item)}>
-                                                    Editar
-                                                </DropdownMenuItem>
-                                            )}
+                                            <DropdownMenuItem onClick={() => openEditTx(item)}>
+                                                Editar
+                                            </DropdownMenuItem>
                                             {item.tipo_registro !== 'ganho' && item.status !== 'pago' && (
                                                 <DropdownMenuItem onClick={() => markAsPaid(item)}>
                                                     Marcar como pago
@@ -772,20 +591,17 @@ export default function Financeiro({
                                                     Remover parcelamento inteiro
                                                 </DropdownMenuItem>
                                             )}
-                                            {!isParcela(item) && (
-                                                <DropdownMenuItem
-                                                    onClick={() => deleteLancamento(item)}
-                                                    className="text-[#DC2626] focus:text-[#DC2626]"
-                                                >
-                                                    Remover
-                                                </DropdownMenuItem>
-                                            )}
+                                            <DropdownMenuItem
+                                                onClick={() => deleteLancamento(item)}
+                                                className="text-[#DC2626] focus:text-[#DC2626]"
+                                            >
+                                                Remover
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
                             </div>
-                            );
-                        })}
+                        ))}
 
                         {filteredTx.length > 0 && (
                             <div className="grid grid-cols-1 items-center gap-4 border-t-2 border-[#E4E3E0] bg-[#F8F8F7] px-5 py-3 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_32px]">
@@ -821,8 +637,8 @@ export default function Financeiro({
                     cycles={cycles}
                     categories={categories}
                     members={members}
-                    membros={createMembros}
-                    onMembrosChange={setCreateMembros}
+                    assigneeIds={createAssignees}
+                    onAssigneesChange={setCreateAssignees}
                 />
             </TxDrawer>
 
@@ -846,8 +662,8 @@ export default function Financeiro({
                             cycles={cycles}
                             categories={categories}
                             members={members}
-                            membros={editMembros}
-                            onMembrosChange={setEditMembros}
+                            assigneeIds={editAssignees}
+                            onAssigneesChange={setEditAssignees}
                             isEditing
                         />
                         <div className="border-t border-[#F0EFED] pt-4">
@@ -928,13 +744,6 @@ export default function Financeiro({
                 description={`Tem certeza que deseja remover "${pendingDelete?.label}"?`}
                 onConfirm={() => { pendingDelete?.action(); setPendingDelete(null); }}
                 onCancel={() => setPendingDelete(null)}
-            />
-
-            {/* ── Gerenciar Categorias ──────────────────────────────────────────── */}
-            <CategoryManager
-                open={catManagerOpen}
-                onClose={() => setCatManagerOpen(false)}
-                categories={categories}
             />
         </AppLayout>
     );

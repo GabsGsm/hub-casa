@@ -31,26 +31,12 @@ class FinanceiroService
     /**
      * Monta todos os dados necessários para a página /financeiro.
      */
-    public function getPageData(House $house, int $year, int $month, string $visao = 'casa', int $userId = 0): array
+    public function getPageData(House $house, int $year, int $month): array
     {
-        $isIndividual = ($visao === 'individual' && $userId > 0);
-
-        // Ciclos: casa mostra todos; individual mostra só os do usuário
-        $allCycles = $this->cycleRepo->getByHouse($house->id);
-        $cycles    = $isIndividual
-            ? $allCycles->where('user_id', $userId)->values()
-            : $allCycles;
-
+        $cycles   = $this->cycleRepo->getByHouse($house->id);
         $gastos   = $this->gastoRepo->getResolvedForMonth($house->id, $year, $month);
         $ganhos   = $this->ganhoRepo->getForMonth($house->id, $year, $month);
         $parcelas = $this->parcelamentoRepo->getParcelasForMonth($house->id, $year, $month);
-
-        // Filtro individual: manter apenas lançamentos onde o userId é membro
-        if ($isIndividual) {
-            $gastos   = $gastos->filter(fn ($g) => collect($g['responsaveis'])->pluck('id')->contains($userId));
-            $parcelas = $parcelas->filter(fn ($p) => collect($p['responsaveis'])->pluck('id')->contains($userId));
-            // Ganhos: sem filtro de membro — são receitas gerais
-        }
 
         $lancamentos = $gastos
             ->merge($ganhos)
@@ -59,40 +45,19 @@ class FinanceiroService
             ->values();
 
         $despesas    = $gastos->merge($parcelas);
-        $cycleTotals = $this->buildCycleTotals($cycles, $despesas, $isIndividual ? $userId : null);
+        $cycleTotals = $this->buildCycleTotals($cycles, $despesas);
 
-        // Resumo: visão individual usa valor do membro; casa usa valor total
-        if ($isIndividual) {
-            $totalReceitas = $ganhos->where('status', '!=', 'impossibilitado')->sum('valor')
-                + $cycles->sum('expected_amount');
+        $totalGanhos   = $ganhos->where('status', '!=', 'impossibilitado')->sum('valor');
+        $totalCiclos   = $cycles->sum('expected_amount');
+        $totalReceitas = $totalCiclos + $totalGanhos;
 
-            $totalDespesas = $despesas
-                ->where('status', '!=', 'impossibilitado')
-                ->sum(function ($item) use ($userId) {
-                    $membro = collect($item['membros_valor'] ?? [])
-                        ->firstWhere('user_id', $userId);
-                    return $membro ? $membro['valor'] : $item['valor'];
-                });
-        } else {
-            $totalGanhos   = $ganhos->where('status', '!=', 'impossibilitado')->sum('valor');
-            $totalCiclos   = $cycles->sum('expected_amount');
-            $totalReceitas = $totalCiclos + $totalGanhos;
-            $totalDespesas = $despesas->where('status', '!=', 'impossibilitado')->sum('valor');
-        }
-
-        // Passar user_color e user_id nos ciclos (para borda colorida)
-        $cycleTotalsWithUser = $cycleTotals->map(function ($c) use ($allCycles) {
-            $cycle = $allCycles->firstWhere('id', $c['id']);
-            return array_merge($c, [
-                'user_id'    => $cycle?->user_id,
-                'user_color' => $cycle?->user?->color,
-                'user_name'  => $cycle?->user?->name,
-            ]);
-        });
+        $totalDespesas = $despesas
+            ->where('status', '!=', 'impossibilitado')
+            ->sum('valor');
 
         return [
             'house'        => ['id' => $house->id, 'name' => $house->name],
-            'cycles'       => $cycleTotalsWithUser,
+            'cycles'       => $cycleTotals,
             'lancamentos'  => $lancamentos,
             'resumo'       => [
                 'total_receitas' => (float) $totalReceitas,
@@ -103,10 +68,9 @@ class FinanceiroService
                 ->where('house_id', $house->id)
                 ->orderBy('name')
                 ->get(['id', 'name', 'color']),
-            'members'      => $house->users()->get(['id', 'name', 'color']),
+            'members'      => $house->users()->get(['id', 'name']),
             'year'         => $year,
             'month'        => $month,
-            'visao'        => $visao,
         ];
     }
 
@@ -131,11 +95,9 @@ class FinanceiroService
         $this->assertCycleBelongsToHouse($house->id, $data['ciclo_id'] ?? null);
         $this->assertCategoryBelongsToHouse($house->id, $data['categoria_id'] ?? null);
 
-        // Se vier o novo formato membros, usa; senão usa responsavel_ids (fallback)
-        $responsavelIds = null;
-        if (! isset($data['membros']) && array_key_exists('responsavel_ids', $data)) {
-            $responsavelIds = $data['responsavel_ids'] ?? [];
-        }
+        $responsavelIds = array_key_exists('responsavel_ids', $data)
+            ? ($data['responsavel_ids'] ?? [])
+            : null;
 
         return $this->gastoRepo->update($gasto, $data, $responsavelIds);
     }
@@ -207,13 +169,6 @@ class FinanceiroService
 
     // ── Parcela individual ───────────────────────────────────────────────────
 
-    public function addParcela(User $user, Parcelamento $parcelamento, array $data): Parcela
-    {
-        $this->ensureCanEdit($user, $parcelamento);
-
-        return $this->parcelamentoRepo->addParcela($parcelamento, $data);
-    }
-
     public function updateParcela(User $user, Parcela $parcela, array $data): Parcela
     {
         $this->ensureCanEdit($user, $parcela->parcelamento);
@@ -256,50 +211,23 @@ class FinanceiroService
     // Privados
     // -------------------------------------------------------------------------
 
-    private function buildCycleTotals(Collection $cycles, Collection $despesas, ?int $userId = null): Collection
+    private function buildCycleTotals(Collection $cycles, Collection $despesas): Collection
     {
-        // Montar mapa plano: ciclo_id → [{valor, status}]
-        // Quando o lançamento tem membros_valor com ciclo_id próprio, usar esses; senão, usar ciclo da transação.
-        $byCiclo = [];
+        $grouped = $despesas->groupBy(fn ($t) => $t['ciclo']['id'] ?? 0);
 
-        foreach ($despesas as $t) {
-            if (! empty($t['membros_valor'])) {
-                foreach ($t['membros_valor'] as $mv) {
-                    if ($userId !== null && (int) $mv['user_id'] !== $userId) {
-                        continue;
-                    }
-                    $key           = $mv['ciclo_id'] ?? 0;
-                    $byCiclo[$key][] = ['valor' => (float) $mv['valor'], 'status' => $t['status']];
-                }
-            } else {
-                // Sem membros, usar ciclo da transação
-                if ($userId !== null) {
-                    continue; // não atribuído a ninguém, ignorar em individual
-                }
-                $key           = $t['ciclo']['id'] ?? 0;
-                $byCiclo[$key][] = ['valor' => (float) $t['valor'], 'status' => $t['status']];
-            }
-        }
+        return $cycles->map(function (PaymentCycle $cycle) use ($grouped) {
+            $items = $grouped->get($cycle->id, collect());
 
-        return $cycles->map(function (PaymentCycle $cycle) use ($byCiclo) {
-            $items = $byCiclo[$cycle->id] ?? [];
-
-            $paid    = (float) array_sum(array_column(
-                array_filter($items, fn ($i) => $i['status'] === 'pago'),
-                'valor',
-            ));
-            $pending = (float) array_sum(array_column(
-                array_filter($items, fn ($i) => $i['status'] === 'aberto'),
-                'valor',
-            ));
+            $paid    = $items->where('status', 'pago')->sum('valor');
+            $pending = $items->where('status', 'aberto')->sum('valor');
 
             return [
                 'id'              => $cycle->id,
                 'name'            => $cycle->name,
                 'expected_amount' => (float) $cycle->expected_amount,
-                'paid'            => $paid,
-                'pending'         => $pending,
-                'committed'       => $paid + $pending,
+                'paid'            => (float) $paid,
+                'pending'         => (float) $pending,
+                'committed'       => (float) ($paid + $pending),
             ];
         });
     }

@@ -25,7 +25,6 @@ class User extends Authenticatable
         'password',
         'house_id',
         'role',
-        'color',
     ];
 
     /**

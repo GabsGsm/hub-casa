@@ -14,13 +14,9 @@ class UpdateParcelaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'valor_parcela'     => ['nullable', 'numeric', 'min:0.01'],
-            'status'            => ['nullable', 'in:aberto,pago,impossibilitado'],
-            'vencimento'        => ['nullable', 'date'],
-            'membros'             => ['nullable', 'array'],
-            'membros.*.user_id'   => ['required_with:membros', 'integer', 'exists:users,id'],
-            'membros.*.valor'     => ['required_with:membros', 'numeric', 'min:0'],
-            'membros.*.ciclo_id'  => ['nullable', 'exists:payment_cycles,id'],
+            'valor_parcela' => ['nullable', 'numeric', 'min:0.01'],
+            'status'        => ['nullable', 'in:aberto,pago,impossibilitado'],
+            'vencimento'    => ['nullable', 'date'],
         ];
     }
 }

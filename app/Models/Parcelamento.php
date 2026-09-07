@@ -64,11 +64,6 @@ class Parcelamento extends Model
         return $this->hasMany(Parcela::class)->orderBy('numero_parcela');
     }
 
-    public function membrosValor(): HasMany
-    {
-        return $this->hasMany(ParcelamentoMembroValor::class);
-    }
-
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

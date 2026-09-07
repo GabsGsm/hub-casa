@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Gasto extends Model
 {
@@ -31,14 +30,11 @@ class Gasto extends Model
         'recorrente',
         'dia_recorrencia',
         'observacoes',
-        'parent_gasto_id',
-        'mes_referencia',
     ];
 
     protected $casts = [
         'valor'           => 'decimal:2',
         'vencimento'      => 'date',
-        'mes_referencia'  => 'date',
         'recorrente'      => 'boolean',
         'dia_recorrencia' => 'integer',
     ];
@@ -70,21 +66,6 @@ class Gasto extends Model
     public function responsaveis(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'gasto_usuario', 'gasto_id', 'user_id');
-    }
-
-    public function membrosValor(): HasMany
-    {
-        return $this->hasMany(GastoMembroValor::class);
-    }
-
-    public function parent(): \Illuminate\Database\Eloquent\Relations\BelongsTo
-    {
-        return $this->belongsTo(self::class, 'parent_gasto_id');
-    }
-
-    public function instancias(): HasMany
-    {
-        return $this->hasMany(self::class, 'parent_gasto_id');
     }
 
     // -------------------------------------------------------------------------

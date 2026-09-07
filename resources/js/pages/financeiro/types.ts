@@ -1,13 +1,3 @@
-// ── Valor por membro ──────────────────────────────────────────────────────────
-export type MembroValor = {
-    user_id: number;
-    user_name: string | null;
-    user_color: string | null;
-    valor: number;
-    status: 'pendente' | 'pago' | 'impossibilitado';
-    ciclo_id: number | null;
-};
-
 // ── Ciclo ─────────────────────────────────────────────────────────────────────
 export type Cycle = {
     id: number;
@@ -16,9 +6,6 @@ export type Cycle = {
     paid: number;
     pending: number;
     committed: number;
-    user_id?: number | null;
-    user_color?: string | null;
-    user_name?: string | null;
 };
 
 // ── Tipos de registro (discriminated union) ──────────────────────────────────
@@ -42,9 +29,7 @@ export type LancamentoGasto = LancamentoBase & {
     recorrente: boolean;
     dia_recorrencia: number | null;
     ciclo: { id: number; name: string } | null;
-    responsaveis: { id: number; name: string; color: string | null }[];
-    membros_valor: MembroValor[];
-    sem_responsavel: boolean;
+    responsaveis: { id: number; name: string }[];
 };
 
 export type LancamentoGanho = LancamentoBase & {
@@ -59,9 +44,7 @@ export type LancamentoParcela = LancamentoBase & {
     total_parcelas: number;
     vencimento: string;
     ciclo: { id: number; name: string } | null;
-    responsaveis: { id: number; name: string; color: string | null }[];
-    membros_valor: MembroValor[];
-    sem_responsavel: boolean;
+    responsaveis: { id: number; name: string }[];
 };
 
 export type Lancamento = LancamentoGasto | LancamentoGanho | LancamentoParcela;
@@ -80,10 +63,9 @@ export type FinanceiroProps = {
     lancamentos: Lancamento[];
     resumo: ResumoMensal;
     categories: { id: number; name: string; color: string | null }[];
-    members: { id: number; name: string; color: string | null }[];
+    members: { id: number; name: string }[];
     year: number;
     month: number; // 1-indexed
-    visao: 'casa' | 'individual';
 };
 
 // ── Filtros ──────────────────────────────────────────────────────────────────
